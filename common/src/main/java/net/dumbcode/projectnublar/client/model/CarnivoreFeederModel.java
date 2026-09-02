@@ -1,35 +1,39 @@
 package net.dumbcode.projectnublar.client.model;
 
+import com.geckolib.constant.dataticket.DataTicket;
+import com.geckolib.model.DefaultedBlockGeoModel;
+import com.geckolib.renderer.base.GeoRenderState;
 import net.dumbcode.projectnublar.Constants;
-import net.dumbcode.projectnublar.block.DinosaurFeederBlock;
 import net.dumbcode.projectnublar.block.entity.DinosaurFeederBlockEntity;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
-import software.bernie.geckolib.model.DefaultedBlockGeoModel;
-import software.bernie.geckolib.model.GeoModel;
+import net.minecraft.resources.Identifier;
 
 public class CarnivoreFeederModel extends DefaultedBlockGeoModel<DinosaurFeederBlockEntity> {
-    private final ResourceLocation FEEDER_MODEL = buildFormattedModelPath(Constants.modLoc("carnivore_feeder_one"));
-    private final ResourceLocation FEEDER_TEXTURE = buildFormattedTexturePath(Constants.modLoc("carnivore_feeder_one_empty"));
-    private final ResourceLocation FEEDER_ANIMATIONS = buildFormattedAnimationPath(Constants.modLoc( "carnivore_feeder_one"));
+    // GeckoLib 5: the model receives the render state, not the animatable, so the full/empty
+    // texture choice is captured into the render state by the renderer (see
+    // CarnivoreFeederRenderer) and read here.
+    public static final DataTicket<Boolean> FEEDER_FULL = DataTicket.create("carnivore_feeder_full", Boolean.class);
+
+    private final Identifier FEEDER_MODEL = buildFormattedModelPath(Constants.modLoc("carnivore_feeder_one"));
+    private final Identifier FEEDER_FULL_TEXTURE = Constants.modLoc("textures/block/feeder/meat/feeder_one/full.png");
+    private final Identifier FEEDER_EMPTY_TEXTURE = Constants.modLoc("textures/block/feeder/meat/feeder_one/empty.png");
+    private final Identifier FEEDER_ANIMATIONS = buildFormattedAnimationPath(Constants.modLoc("carnivore_feeder_one"));
 
     public CarnivoreFeederModel() {
         super(Constants.modLoc("carnivore_feeder_one"));
     }
 
     @Override
-    public ResourceLocation getModelResource(DinosaurFeederBlockEntity animatable) {
+    public Identifier getModelResource(GeoRenderState renderState) {
         return FEEDER_MODEL;
     }
 
     @Override
-    public ResourceLocation getTextureResource(DinosaurFeederBlockEntity animatable) {
-        return FEEDER_TEXTURE;
+    public Identifier getTextureResource(GeoRenderState renderState) {
+        return Boolean.TRUE.equals(renderState.getGeckolibData(FEEDER_FULL)) ? FEEDER_FULL_TEXTURE : FEEDER_EMPTY_TEXTURE;
     }
 
     @Override
-    public ResourceLocation getAnimationResource(DinosaurFeederBlockEntity animatable) {
+    public Identifier getAnimationResource(DinosaurFeederBlockEntity animatable) {
         return FEEDER_ANIMATIONS;
     }
-
 }

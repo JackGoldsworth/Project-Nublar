@@ -1,6 +1,6 @@
 package net.dumbcode.projectnublar.api.fossil;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record FossilQuality(
         String configId,

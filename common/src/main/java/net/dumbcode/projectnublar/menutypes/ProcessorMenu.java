@@ -1,5 +1,6 @@
 package net.dumbcode.projectnublar.menutypes;
 
+import net.dumbcode.projectnublar.init.DataComponentInit;
 import net.dumbcode.projectnublar.init.ItemInit;
 import net.dumbcode.projectnublar.init.MenuTypeInit;
 import net.dumbcode.projectnublar.item.ComputerChipItem;
@@ -39,7 +40,7 @@ public class ProcessorMenu extends AbstractContainerMenu {
         this.addSlot(new Slot(container, 1, 80, 18){
             @Override
             public boolean mayPlace(ItemStack stack) {
-                return stack.is(ItemInit.FOSSIL_ITEM.get()) || (stack.is(ItemInit.AMBER_ITEM.get()) && stack.hasTag() && stack.getTag().contains("dna_percentage"));
+                return stack.is(ItemInit.FOSSIL_ITEM.get()) || (stack.is(ItemInit.AMBER_ITEM.get()) && stack.has(DataComponentInit.DNA_DATA.get()));
             }
         });
 
@@ -65,7 +66,7 @@ public class ProcessorMenu extends AbstractContainerMenu {
         this.addSlot(new Slot(container, 2, 136, 40){
             @Override
             public boolean mayPlace(ItemStack stack) {
-                return stack.is(ItemInit.TEST_TUBE_ITEM.get()) && !stack.hasTag();
+                return stack.is(ItemInit.TEST_TUBE_ITEM.get()) && !stack.has(DataComponentInit.DNA_DATA.get());
             }
         });
         for(int i = 0; i < 3; ++i) {
@@ -102,7 +103,7 @@ public class ProcessorMenu extends AbstractContainerMenu {
                 }
             } else {
 
-                if (itemstack1.is(ItemInit.FOSSIL_ITEM.get()) || (itemstack1.is(ItemInit.AMBER_ITEM.get()) && itemstack1.hasTag() && itemstack1.getTag().contains("dna_percentage"))) {
+                if (itemstack1.is(ItemInit.FOSSIL_ITEM.get()) || (itemstack1.is(ItemInit.AMBER_ITEM.get()) && itemstack1.has(DataComponentInit.DNA_DATA.get()))) {
                     if (!this.moveItemStackTo(itemstack1, 1, 2, false)) {
                         return ItemStack.EMPTY;
                     }
@@ -124,7 +125,7 @@ public class ProcessorMenu extends AbstractContainerMenu {
                     if (!this.moveItemStackTo(itemstack1, 4, 5, false)) {
                         return ItemStack.EMPTY;
                     }
-                } else if (itemstack1.is(ItemInit.TEST_TUBE_ITEM.get()) && !itemstack1.hasTag()) {
+                } else if (itemstack1.is(ItemInit.TEST_TUBE_ITEM.get()) && !itemstack1.has(DataComponentInit.DNA_DATA.get())) {
                     if (!this.moveItemStackTo(itemstack1, 5, 6, false)) {
                         return ItemStack.EMPTY;
                     }

@@ -2,7 +2,7 @@ package net.dumbcode.projectnublar.client.widget;
 
 import net.dumbcode.projectnublar.client.screen.SequencerScreen;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -50,7 +50,7 @@ public class BorderedButton extends AbstractButton {
         setTooltip(builder.tooltip); // Forge: Make use of the Builder tooltip
     }
 
-    public void onPress() {
+    public void onPress(net.minecraft.client.input.InputWithModifiers input) {
         this.onPress.onPress(this);
     }
 
@@ -65,10 +65,11 @@ public class BorderedButton extends AbstractButton {
     }
 
     @Override
-    protected void renderWidget(GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
-        SequencerScreen.drawBorder(pGuiGraphics, this.getX(), this.getY(), this.width, this.height, 1, 1);
-        pGuiGraphics.fill(this.getX() + 1, this.getY() + 1, this.getX() + this.width - 1, this.getY() + this.height - 1, 0xFF000000);
-        this.renderString(pGuiGraphics, Minecraft.getInstance().font, 0xFFFFFFFF);
+    protected void extractContents(GuiGraphicsExtractor pGuiGraphicsExtractor, int pMouseX, int pMouseY, float pPartialTick) {
+        SequencerScreen.drawBorder(pGuiGraphicsExtractor, this.getX(), this.getY(), this.width, this.height, 1, 1);
+        pGuiGraphicsExtractor.fill(this.getX() + 1, this.getY() + 1, this.getX() + this.width - 1, this.getY() + this.height - 1, 0xFF000000);
+        Component colored = this.getMessage().copy().withStyle(style -> style.withColor(0xFFFFFFFF));
+        this.extractScrollingStringOverContents(pGuiGraphicsExtractor.textRendererForWidget(this, GuiGraphicsExtractor.HoveredTextEffects.NONE), colored, 2);
     }
     public void setMessageConsumer(Function<BorderedButton,Boolean> messageConsumer) {
         this.messageConsumer = messageConsumer;

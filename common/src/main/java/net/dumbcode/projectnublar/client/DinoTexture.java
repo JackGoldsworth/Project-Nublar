@@ -1,10 +1,11 @@
 package net.dumbcode.projectnublar.client;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.platform.TextureUtil;
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.renderer.texture.SimpleTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.renderer.texture.ReloadableTexture;
+import net.minecraft.client.renderer.texture.TextureContents;
+import net.minecraft.client.renderer.texture.MipmapStrategy;
+import net.minecraft.client.resources.metadata.texture.TextureMetadataSection;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.lwjgl.system.MemoryStack;
 
@@ -14,21 +15,23 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public class DinoTexture extends SimpleTexture {
+// NOTE: currently unreferenced by any live code (left over from the old skin-dyeing system);
+// ported as-is to the 26.2 ReloadableTexture API in case it is revived.
+public class DinoTexture extends ReloadableTexture {
     private static final Set<UUID> usedIds = new HashSet<>();
     private final ByteBuffer dataRef;
 
-    public static DinoTexture create(ResourceLocation name, ByteBuffer data) {
+    public static DinoTexture create(Identifier name, ByteBuffer data) {
         return new DinoTexture(name, data);
     }
 
-    private DinoTexture(ResourceLocation location, ByteBuffer data) {
+    private DinoTexture(Identifier location, ByteBuffer data) {
         super(location);
         this.dataRef = data;
     }
 
-    public ResourceLocation getLocation() {
-        return this.location;
+    public Identifier getLocation() {
+        return this.resourceId();
     }
 
     public NativeImage asNative(){
@@ -47,31 +50,16 @@ public class DinoTexture extends SimpleTexture {
             throw new RuntimeException(e);
         }
     }
+
+    // 26.2: textures load via TextureContents instead of manually uploading in load(ResourceManager)
     @Override
-    public void load(ResourceManager manager) {
-        ByteBuffer data = this.dataRef;
-
-        if (data == null)
-            return;
-
-        try (MemoryStack memoryStack = MemoryStack.stackPush()) {
-            ByteBuffer lwjglData = memoryStack.malloc(data.capacity());
-            lwjglData.put(data);
-            data.rewind();
-            lwjglData.rewind();
-            NativeImage image = NativeImage.read(lwjglData);
-
-            if (RenderSystem.isOnRenderThreadOrInit()) {
-                upload(image);
-            } else {
-                RenderSystem.recordRenderCall(() -> upload(image));
-            }
-        } catch (Exception ignored) {
+    public TextureContents loadContents(ResourceManager manager) {
+        NativeImage image = asNative();
+        if (image == null) {
+            return TextureContents.createMissing();
         }
-    }
-
-    private void upload(NativeImage image) {
-        TextureUtil.prepareImage(getId(), 0, image.getWidth(), image.getHeight());
-        image.upload(0, 0, 0, true);
+        return new TextureContents(image, new TextureMetadataSection(
+                TextureMetadataSection.DEFAULT_BLUR, TextureMetadataSection.DEFAULT_CLAMP,
+                MipmapStrategy.AUTO, TextureMetadataSection.DEFAULT_ALPHA_CUTOFF_BIAS));
     }
 }

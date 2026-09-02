@@ -1,12 +1,12 @@
 package net.dumbcode.projectnublar.block.entity;
 
-import earth.terrarium.botarium.common.energy.base.BotariumEnergyBlock;
-import earth.terrarium.botarium.common.energy.impl.InsertOnlyEnergyContainer;
-import earth.terrarium.botarium.common.energy.impl.WrappedBlockEnergyContainer;
 import net.dumbcode.projectnublar.api.NublarMath;
 import net.dumbcode.projectnublar.api.DNAData;
+import net.dumbcode.projectnublar.block.api.MachineEnergyHandler;
+import net.dumbcode.projectnublar.block.api.NublarEnergyBlock;
 import net.dumbcode.projectnublar.block.api.SyncingContainerBlockEntity;
 import net.dumbcode.projectnublar.init.BlockInit;
+import net.dumbcode.projectnublar.init.DataComponentInit;
 import net.dumbcode.projectnublar.init.ItemInit;
 import net.dumbcode.projectnublar.item.ComputerChipItem;
 import net.dumbcode.projectnublar.item.FilterItem;
@@ -15,7 +15,6 @@ import net.dumbcode.projectnublar.menutypes.ProcessorMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Container;
@@ -28,12 +27,14 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
-import software.bernie.geckolib.animatable.GeoBlockEntity;
-import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.core.animation.AnimatableManager;
-import software.bernie.geckolib.util.GeckoLibUtil;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import com.geckolib.animatable.GeoBlockEntity;
+import com.geckolib.animatable.instance.AnimatableInstanceCache;
+import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.util.GeckoLibUtil;
 
-public class ProcessorBlockEntity extends SyncingContainerBlockEntity implements GeoBlockEntity, BotariumEnergyBlock<WrappedBlockEnergyContainer> {
+public class ProcessorBlockEntity extends SyncingContainerBlockEntity implements GeoBlockEntity, NublarEnergyBlock {
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     ItemStack water = ItemStack.EMPTY;
     ItemStack input = ItemStack.EMPTY;
@@ -44,7 +45,7 @@ public class ProcessorBlockEntity extends SyncingContainerBlockEntity implements
     NonNullList<ItemStack> output = NonNullList.withSize(9, ItemStack.EMPTY);
     float fluidLevel = 0;;
     int cookingProgress = 0;
-    private WrappedBlockEnergyContainer energyContainer;
+    private MachineEnergyHandler energyHandler;
 
     protected final ContainerData dataAccess = new ContainerData() {
         public int get(int slot) {
@@ -90,17 +91,17 @@ public class ProcessorBlockEntity extends SyncingContainerBlockEntity implements
             if (be.cookingProgress < be.getMaxProcessingTime()) {
                 be.cookingProgress++;
                 be.fluidLevel -= 250f / be.getMaxProcessingTime();
-                be.getEnergyStorage().internalExtract(calculateEnergyConsumption(), true);
+                be.getEnergyHandler().internalExtract(calculateEnergyConsumption(), true);
             } else {
                 be.cookingProgress = 0;
                 ItemStack stack = new ItemStack(ItemInit.TEST_TUBE_ITEM.get());
-                DNAData dnaData = DNAData.loadFromNBT(be.input.getTag().getCompound("DNAData"));
-                double dnaPercentage = dnaData.getDnaPercentage();
+                DNAData dnaData = be.input.get(DataComponentInit.DNA_DATA.get());
+                double dnaPercentage = dnaData == null ? 0 : dnaData.getDnaPercentage();
                 DNAData ttData = new DNAData();
                 ttData.setDnaPercentage(NublarMath.round(dnaPercentage * be.getFilterEfficiency(),2));
-                ttData.setEntityType(dnaData.getEntityType());
-                ttData.setVariant(dnaData.getVariant());
-                stack.getOrCreateTag().put("DNAData", ttData.saveToNBT(new CompoundTag()));
+                ttData.setEntityType(dnaData == null ? null : dnaData.getEntityType());
+                ttData.setVariant(dnaData == null ? null : dnaData.getVariant());
+                stack.set(DataComponentInit.DNA_DATA.get(), ttData);
                 be.input.shrink(1);
                 be.testTube.shrink(1);
                 be.addToOutput(stack);
@@ -128,38 +129,38 @@ public class ProcessorBlockEntity extends SyncingContainerBlockEntity implements
         return c;
     }
     @Override
-    public WrappedBlockEnergyContainer getEnergyStorage() {
-        return energyContainer == null ? this.energyContainer = new WrappedBlockEnergyContainer(this, new InsertOnlyEnergyContainer(1000,1000)) : this.energyContainer;
+    public MachineEnergyHandler getEnergyHandler() {
+        return energyHandler == null ? this.energyHandler = new MachineEnergyHandler(1000, 1000, 0, this::setChanged) : this.energyHandler;
     }
 
-    public void saveData(CompoundTag pTag) {
-        pTag.put("water", water.save(new CompoundTag()));
-        pTag.put("input", input.save(new CompoundTag()));
-        pTag.put("testTube", testTube.save(new CompoundTag()));
+    public void saveData(ValueOutput pOutput) {
+        pOutput.store("water", ItemStack.OPTIONAL_CODEC, water);
+        pOutput.store("input", ItemStack.OPTIONAL_CODEC, input);
+        pOutput.store("testTube", ItemStack.OPTIONAL_CODEC, testTube);
         for (int i = 0; i < output.size(); i++) {
-            pTag.put("item" + i, output.get(i).save(new CompoundTag()));
+            pOutput.store("item" + i, ItemStack.OPTIONAL_CODEC, output.get(i));
         }
-        pTag.putFloat("fluidLevel", fluidLevel);
-        pTag.putInt("cookingProgress", cookingProgress);
-        pTag.put("filter", filter.save(new CompoundTag()));
-        pTag.put("tankUpgrade", tankUpgrade.save(new CompoundTag()));
-        pTag.put("chipUpgrade", chipUpgrade.save(new CompoundTag()));
-        pTag.put("energy", energyContainer.serialize(new CompoundTag()));
+        pOutput.putFloat("fluidLevel", fluidLevel);
+        pOutput.putInt("cookingProgress", cookingProgress);
+        pOutput.store("filter", ItemStack.OPTIONAL_CODEC, filter);
+        pOutput.store("tankUpgrade", ItemStack.OPTIONAL_CODEC, tankUpgrade);
+        pOutput.store("chipUpgrade", ItemStack.OPTIONAL_CODEC, chipUpgrade);
+        getEnergyHandler().serialize(pOutput.child("energy"));
     }
 
-    public void loadData(CompoundTag pTag) {
-        water = ItemStack.of(pTag.getCompound("water"));
-        input = ItemStack.of(pTag.getCompound("input"));
-        testTube = ItemStack.of(pTag.getCompound("testTube"));
+    public void loadData(ValueInput pInput) {
+        water = pInput.read("water", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        input = pInput.read("input", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        testTube = pInput.read("testTube", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
         for (int i = 0; i < output.size(); i++) {
-            output.set(i, ItemStack.of(pTag.getCompound("item" + i)));
+            output.set(i, pInput.read("item" + i, ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY));
         }
-        fluidLevel = pTag.getFloat("fluidLevel");
-        cookingProgress = pTag.getInt("cookingProgress");
-        filter = ItemStack.of(pTag.getCompound("filter"));
-        tankUpgrade = ItemStack.of(pTag.getCompound("tankUpgrade"));
-        chipUpgrade = ItemStack.of(pTag.getCompound("chipUpgrade"));
-        energyContainer.deserialize(pTag.getCompound("energy"));
+        fluidLevel = pInput.getFloatOr("fluidLevel", 0f);
+        cookingProgress = pInput.getIntOr("cookingProgress", 0);
+        filter = pInput.read("filter", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        tankUpgrade = pInput.read("tankUpgrade", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        chipUpgrade = pInput.read("chipUpgrade", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        getEnergyHandler().deserialize(pInput.childOrEmpty("energy"));
     }
 
 
@@ -279,7 +280,7 @@ public class ProcessorBlockEntity extends SyncingContainerBlockEntity implements
             if (output.get(i).isEmpty()) {
                 output.set(i, stack);
                 return true;
-            } else if (ItemStack.isSameItemSameTags(output.get(i), stack)) {
+            } else if (ItemStack.isSameItemSameComponents(output.get(i), stack)) {
                 output.get(i).grow(stack.getCount());
                 return true;
             }
@@ -325,4 +326,20 @@ public class ProcessorBlockEntity extends SyncingContainerBlockEntity implements
         return new AABB(getBlockPos()).inflate(4);
     }
 
+
+    @Override
+    protected net.minecraft.core.NonNullList<ItemStack> getItems() {
+        NonNullList<ItemStack> items = NonNullList.withSize(getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < items.size(); i++) {
+            items.set(i, getItem(i));
+        }
+        return items;
+    }
+
+    @Override
+    protected void setItems(NonNullList<ItemStack> items) {
+        for (int i = 0; i < Math.min(items.size(), getContainerSize()); i++) {
+            setItem(i, items.get(i));
+        }
+    }
 }

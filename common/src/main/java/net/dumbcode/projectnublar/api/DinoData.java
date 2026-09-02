@@ -2,12 +2,15 @@ package net.dumbcode.projectnublar.api;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.dumbcode.projectnublar.init.DataComponentInit;
 import net.dumbcode.projectnublar.init.GeneInit;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.StringUtil;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
@@ -21,6 +24,15 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 public class DinoData {
+
+    public static final Codec<DinoData> CODEC = CompoundTag.CODEC.xmap(DinoData::fromNBT, DinoData::toNBT);
+
+    public static final StreamCodec<io.netty.buffer.ByteBuf, DinoData> STREAM_CODEC =
+            ByteBufCodecs.COMPOUND_TAG.map(DinoData::fromNBT, DinoData::toNBT);
+
+    public static final StreamCodec<io.netty.buffer.ByteBuf, Map<String, DNAData>> MAP_STREAM_CODEC =
+            ByteBufCodecs.map(HashMap::new, ByteBufCodecs.STRING_UTF8, DNAData.STREAM_CODEC);
+
     public double basePercentage;
     public double incubationProgress = -1;
     public int incubationTimeLeft = -1;
@@ -38,7 +50,7 @@ public class DinoData {
             0xFFFFFF,
             0xFFFFFF
     );
-    private ResourceLocation textureLocation = null;
+    private Identifier textureLocation = null;
 
     public DinoData() {
     }
@@ -52,7 +64,8 @@ public class DinoData {
     }
 
     public static DinoData fromStack(ItemStack stack) {
-        return fromNBT(stack.getTag().getCompound("DinoData"));
+        DinoData data = stack.get(DataComponentInit.DINO_DATA.get());
+        return data == null ? new DinoData() : data;
     }
 
     public Map<EntityInfo, Double> getEntityPercentages() {
@@ -102,7 +115,7 @@ public class DinoData {
             components.add(Component.literal(("Incubation Progress: " + (int) NublarMath.round(incubationProgress * 100, 0)) + "%"));
         }
         if (incubationTimeLeft != -1) {
-            components.add(Component.literal(StringUtil.formatTickDuration(incubationTimeLeft)));
+            components.add(Component.literal(StringUtil.formatTickDuration(incubationTimeLeft, 20.0F)));
         }
         if (finalGenes.isEmpty()) {
             finalizeGenes();
@@ -187,29 +200,32 @@ public class DinoData {
     }
 
     public static DinoData fromNBT(CompoundTag tag) {
-        double basePercentage = tag.getDouble("basePercentage");
+        double basePercentage = tag.getDoubleOr("basePercentage", 0);
         Map<EntityInfo, Double> entityPercentages = new HashMap<>();
-        CompoundTag entityTag = tag.getCompound("entityPercentages");
-        for (String key : entityTag.getAllKeys()) {
-            CompoundTag entityInfo = entityTag.getCompound(key);
-            EntityType<?> type = EntityType.byString(entityInfo.getString("type")).get();
-            String variant = entityInfo.contains("variant") ? entityInfo.getString("variant") : null;
-            double percentage = entityInfo.getDouble("percentage");
-            entityPercentages.put(new EntityInfo(type, variant), percentage);
-        }
+        tag.getCompound("entityPercentages").ifPresent(entityTag -> {
+            for (String key : entityTag.keySet()) {
+                entityTag.getCompound(key).ifPresent(entityInfo -> {
+                    EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getValue(Identifier.parse(entityInfo.getStringOr("type", "minecraft:pig")));
+                    String variant = entityInfo.getString("variant").orElse(null);
+                    double percentage = entityInfo.getDoubleOr("percentage", 0);
+                    entityPercentages.put(new EntityInfo(type, variant), percentage);
+                });
+            }
+        });
         DinoData data = new DinoData();
-        CompoundTag geneTag = tag.getCompound("genes");
-        for (String key : geneTag.getAllKeys()) {
-            data.advancedGenes.put(Genes.byName(key), geneTag.getDouble(key));
-        }
+        tag.getCompound("genes").ifPresent(geneTag -> {
+            for (String key : geneTag.keySet()) {
+                data.advancedGenes.put(Genes.byName(key), geneTag.getDoubleOr(key, 0));
+            }
+        });
         data.basePercentage = basePercentage;
         data.entityPercentages = entityPercentages;
         if (tag.contains("baseDino"))
-            data.baseDino = EntityType.byString(tag.getString("baseDino")).get();
+            data.baseDino = BuiltInRegistries.ENTITY_TYPE.getValue(Identifier.parse(tag.getStringOr("baseDino", "minecraft:pig")));
         if (tag.contains("incubationProgress"))
-            data.incubationProgress = tag.getDouble("incubationProgress");
+            data.incubationProgress = tag.getDoubleOr("incubationProgress", -1);
         if (tag.contains("incubationTimeLeft"))
-            data.incubationTimeLeft = tag.getInt("incubationTimeLeft");
+            data.incubationTimeLeft = tag.getIntOr("incubationTimeLeft", -1);
         return data;
     }
 
@@ -240,8 +256,7 @@ public class DinoData {
     }
 
     public void toStack(ItemStack stack) {
-        stack.getOrCreateTag().put("DinoData", toNBT());
-
+        stack.set(DataComponentInit.DINO_DATA.get(), this);
     }
 
     public double getIncubationProgress() {
@@ -260,5 +275,25 @@ public class DinoData {
                 ).apply(instance, EntityInfo::new)
         );
 
+    }
+
+    // 26.2: data components must implement equals/hashCode (registration validation crashes otherwise)
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (!(obj instanceof DinoData other)) return false;
+        return Double.compare(basePercentage, other.basePercentage) == 0
+                && Double.compare(incubationProgress, other.incubationProgress) == 0
+                && incubationTimeLeft == other.incubationTimeLeft
+                && java.util.Objects.equals(baseDino, other.baseDino)
+                && entityPercentages.equals(other.entityPercentages)
+                && advancedGenes.equals(other.advancedGenes)
+                && layerColors.equals(other.layerColors)
+                && java.util.Objects.equals(textureLocation, other.textureLocation);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(basePercentage, incubationProgress, incubationTimeLeft, baseDino, entityPercentages, advancedGenes, layerColors, textureLocation);
     }
 }

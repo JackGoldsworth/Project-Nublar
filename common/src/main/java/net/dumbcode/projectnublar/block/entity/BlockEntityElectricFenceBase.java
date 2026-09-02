@@ -6,13 +6,11 @@ import net.dumbcode.projectnublar.block.api.Connection;
 import net.dumbcode.projectnublar.block.api.SyncingBlockEntity;
 import net.dumbcode.projectnublar.init.BlockInit;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.dumbcode.projectnublar.annotation.OnlyIn.Dist;
+import net.dumbcode.projectnublar.annotation.OnlyIn;
 
 import java.util.Collections;
 import java.util.Set;
@@ -51,12 +49,12 @@ public abstract class BlockEntityElectricFenceBase extends SyncingBlockEntity im
     }
 
     @Override
-    protected void saveData(CompoundTag tag) {
+    protected void saveData(net.minecraft.world.level.storage.ValueOutput output) {
 
     }
 
     @Override
-    protected void loadData(CompoundTag tag) {
+    protected void loadData(net.minecraft.world.level.storage.ValueInput input) {
 
     }
 

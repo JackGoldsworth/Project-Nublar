@@ -1,36 +1,34 @@
 package net.dumbcode.projectnublar.network.c2s;
 
-import commonnetwork.networking.data.PacketContext;
 import net.dumbcode.projectnublar.Constants;
-import net.dumbcode.projectnublar.api.DinoData;
 import net.dumbcode.projectnublar.block.entity.IncubatorBlockEntity;
-import net.dumbcode.projectnublar.block.entity.SequencerBlockEntity;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.inventory.Slot;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.dumbcode.projectnublar.network.PacketContext;
 
-import java.util.List;
+public record UpdateIncubatorSlotPacket(BlockPos pos, int index, int x, int y) implements CustomPacketPayload {
+    public static final Type<UpdateIncubatorSlotPacket> TYPE = new Type<>(Constants.modLoc("update_incubator_slot"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, UpdateIncubatorSlotPacket> STREAM_CODEC = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, UpdateIncubatorSlotPacket::pos,
+            ByteBufCodecs.INT, UpdateIncubatorSlotPacket::index,
+            ByteBufCodecs.INT, UpdateIncubatorSlotPacket::x,
+            ByteBufCodecs.INT, UpdateIncubatorSlotPacket::y,
+            UpdateIncubatorSlotPacket::new);
 
-public record UpdateIncubatorSlotPacket(BlockPos pos, int index, int x, int y) {
-    public static ResourceLocation ID = Constants.modLoc("update_incubator_slot");
-    public static UpdateIncubatorSlotPacket decode(FriendlyByteBuf buf) {
-        return new UpdateIncubatorSlotPacket(buf.readBlockPos(),buf.readInt(), buf.readInt(), buf.readInt());
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeBlockPos(pos());
-        buf.writeInt(index());
-        buf.writeInt(x());
-        buf.writeInt(y());
-    }
-    public static void handle(PacketContext<UpdateIncubatorSlotPacket> context) {
-        context.sender().getServer().execute(() -> {
-            BlockPos pos = context.message().pos();
-            IncubatorBlockEntity entity = (IncubatorBlockEntity) context.sender().level().getBlockEntity(pos);
-            if(entity != null) {
-                entity.updateSlot(context.message().index(), context.message().x(), context.message().y());
+
+    public static void handle(UpdateIncubatorSlotPacket payload, PacketContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().level().getBlockEntity(payload.pos()) instanceof IncubatorBlockEntity entity) {
+                entity.updateSlot(payload.index(), payload.x(), payload.y());
+                entity.updateBlock();
             }
-            entity.updateBlock();
         });
     }
 }

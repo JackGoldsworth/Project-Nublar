@@ -5,18 +5,18 @@ package net.dumbcode.projectnublar.client.widget;
 import net.dumbcode.projectnublar.Constants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.FastColor;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 
 import java.awt.*;
 
 public class DinoColorPickerWidget<T extends GuiEventListener> extends ParentWidget<T> {
-    public static final ResourceLocation COLOR_WHEEL_BACKGROUND = new ResourceLocation(Constants.MODID, "textures/gui/color_wheel_background.png");
+    public static final Identifier COLOR_WHEEL_BACKGROUND = Identifier.fromNamespaceAndPath(Constants.MODID, "textures/gui/color_wheel_background.png");
     private float currentHue = 0;
     private float currentSaturation = 0;
     private float currentValue = 0.0f;
@@ -125,13 +125,13 @@ public class DinoColorPickerWidget<T extends GuiEventListener> extends ParentWid
     }
 
     @Override
-    protected void renderBackground(GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
-        pGuiGraphics.pose().translate(0,0,1000);
-//        pGuiGraphics.blit(COLOR_WHEEL_BACKGROUND, this.getX(), this.getY(), 0, 0, this.width, this.height, this.width, this.height);
+    protected void renderBackground(GuiGraphicsExtractor pGuiGraphicsExtractor, int pMouseX, int pMouseY, float pPartialTick) {
+        pGuiGraphicsExtractor.nextStratum();
+//        pGuiGraphicsExtractor.blit(RenderPipelines.GUI_TEXTURED, COLOR_WHEEL_BACKGROUND, this.getX(), this.getY(), 0, 0, this.width, this.height, this.width, this.height);
     }
 
     @Override
-    protected void renderForeground(GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
+    protected void renderForeground(GuiGraphicsExtractor pGuiGraphicsExtractor, int pMouseX, int pMouseY, float pPartialTick) {
 
     }
 

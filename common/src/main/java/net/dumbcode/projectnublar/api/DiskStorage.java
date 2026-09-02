@@ -2,14 +2,12 @@ package net.dumbcode.projectnublar.api;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.DyeColor;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -32,22 +30,25 @@ public class DiskStorage {
             synthedEntityTag.putDouble(BuiltInRegistries.ENTITY_TYPE.getKey(entry.getKey()).toString(), entry.getValue());
         }
         tag.put("synthedEntities", synthedEntityTag);
-        List<Integer> colors = new ArrayList<>();
+        int[] colors = new int[tropicalFishColors.size()];
+        int i = 0;
         for (DyeColor color : tropicalFishColors) {
-            colors.add(color.getId());
+            colors[i++] = color.getId();
         }
         tag.putIntArray("tropicalFishColors", colors);
         return tag;
     }
 
     public void load(CompoundTag tag) {
-        CompoundTag synthedEntityTag = tag.getCompound("synthedEntities");
-        for (String key : synthedEntityTag.getAllKeys()) {
-            synthedEntityMap.put(BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.tryParse(key)), synthedEntityTag.getDouble(key));
+        CompoundTag synthedEntityTag = tag.getCompoundOrEmpty("synthedEntities");
+        for (String key : synthedEntityTag.keySet()) {
+            synthedEntityMap.put(BuiltInRegistries.ENTITY_TYPE.getValue(Identifier.parse(key)), synthedEntityTag.getDoubleOr(key, 0.0));
         }
-        for (int color : tag.getIntArray("tropicalFishColors")) {
-            tropicalFishColors.add(DyeColor.byId(color));
-        }
+        tag.getIntArray("tropicalFishColors").ifPresent(colors -> {
+            for (int color : colors) {
+                tropicalFishColors.add(DyeColor.byId(color));
+            }
+        });
     }
     public static DiskStorage createFromTag(CompoundTag tag) {
         DiskStorage storage = new DiskStorage();

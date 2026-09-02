@@ -1,10 +1,9 @@
 package net.dumbcode.projectnublar.block.entity;
 
-import earth.terrarium.botarium.common.energy.base.BotariumEnergyBlock;
-import earth.terrarium.botarium.common.energy.impl.InsertOnlyEnergyContainer;
-import earth.terrarium.botarium.common.energy.impl.WrappedBlockEnergyContainer;
 import net.dumbcode.projectnublar.api.DinoData;
 import net.dumbcode.projectnublar.block.api.IMachineParts;
+import net.dumbcode.projectnublar.block.api.MachineEnergyHandler;
+import net.dumbcode.projectnublar.block.api.NublarEnergyBlock;
 import net.dumbcode.projectnublar.block.api.SyncingContainerBlockEntity;
 import net.dumbcode.projectnublar.init.BlockInit;
 import net.dumbcode.projectnublar.init.ItemInit;
@@ -14,7 +13,6 @@ import net.dumbcode.projectnublar.item.PlantTankItem;
 import net.dumbcode.projectnublar.menutypes.IncubatorMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
@@ -24,12 +22,14 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import software.bernie.geckolib.animatable.GeoBlockEntity;
-import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.core.animation.AnimatableManager;
-import software.bernie.geckolib.util.GeckoLibUtil;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import com.geckolib.animatable.GeoBlockEntity;
+import com.geckolib.animatable.instance.AnimatableInstanceCache;
+import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.util.GeckoLibUtil;
 
-public class IncubatorBlockEntity extends SyncingContainerBlockEntity implements GeoBlockEntity, IMachineParts, BotariumEnergyBlock<WrappedBlockEnergyContainer> {
+public class IncubatorBlockEntity extends SyncingContainerBlockEntity implements GeoBlockEntity, IMachineParts, NublarEnergyBlock {
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     private ItemStack plantMatterStack = ItemStack.EMPTY;
     private NonNullList<Slot> items = NonNullList.withSize(9, Slot.EMPTY);
@@ -42,7 +42,7 @@ public class IncubatorBlockEntity extends SyncingContainerBlockEntity implements
     private ItemStack lidStack = ItemStack.EMPTY;
     private ItemStack baseStack = ItemStack.EMPTY;
     private ItemStack armStack = ItemStack.EMPTY;
-    private WrappedBlockEnergyContainer energyContainer;
+    private MachineEnergyHandler energyHandler;
 
     public IncubatorBlockEntity(BlockPos pos, BlockState state) {
         super(BlockInit.INCUBATOR_BLOCK_ENTITY.get(), pos, state);
@@ -116,56 +116,41 @@ public class IncubatorBlockEntity extends SyncingContainerBlockEntity implements
     }
 
     @Override
-    protected void saveData(CompoundTag tag) {
+    protected void saveData(ValueOutput output) {
         items.forEach(slot -> {
-            CompoundTag slotTag = new CompoundTag();
+            ValueOutput slotTag = output.child("slot" + items.indexOf(slot));
             slotTag.putInt("x", slot.x);
             slotTag.putInt("y", slot.y);
-            slot.stack.save(slotTag);
-            tag.put("slot" + items.indexOf(slot), slotTag);
+            slotTag.store("stack", ItemStack.OPTIONAL_CODEC, slot.stack);
         });
-        tag.put("plantMatterStack", plantMatterStack.save(new CompoundTag()));
-        tag.putInt("plantMatter", plantMatter);
-        CompoundTag containerTag = new CompoundTag();
-        containerStack.save(containerTag);
-        tag.put("containerStack", containerTag);
-        CompoundTag bulbTag = new CompoundTag();
-        bulbStack.save(bulbTag);
-        tag.put("bulbStack", bulbTag);
-        CompoundTag tankTag = new CompoundTag();
-        tankStack.save(tankTag);
-        tag.put("tankStack", tankTag);
-        CompoundTag nestTag = new CompoundTag();
-        nestStack.save(nestTag);
-        tag.put("nestStack", nestTag);
-        CompoundTag lidTag = new CompoundTag();
-        lidStack.save(lidTag);
-        tag.put("lidStack", lidTag);
-        CompoundTag baseTag = new CompoundTag();
-        baseStack.save(baseTag);
-        tag.put("baseStack", baseTag);
-        CompoundTag armTag = new CompoundTag();
-        armStack.save(armTag);
-        tag.put("armStack", armTag);
-        tag.put("energy", energyContainer.serialize(new CompoundTag()));
+        output.store("plantMatterStack", ItemStack.OPTIONAL_CODEC, plantMatterStack);
+        output.putInt("plantMatter", plantMatter);
+        output.store("containerStack", ItemStack.OPTIONAL_CODEC, containerStack);
+        output.store("bulbStack", ItemStack.OPTIONAL_CODEC, bulbStack);
+        output.store("tankStack", ItemStack.OPTIONAL_CODEC, tankStack);
+        output.store("nestStack", ItemStack.OPTIONAL_CODEC, nestStack);
+        output.store("lidStack", ItemStack.OPTIONAL_CODEC, lidStack);
+        output.store("baseStack", ItemStack.OPTIONAL_CODEC, baseStack);
+        output.store("armStack", ItemStack.OPTIONAL_CODEC, armStack);
+        getEnergyHandler().serialize(output.child("energy"));
     }
 
     @Override
-    protected void loadData(CompoundTag tag) {
+    protected void loadData(ValueInput input) {
         for (int i = 0; i < 9; i++) {
-            CompoundTag slotTag = tag.getCompound("slot" + i);
-            items.set(i, new Slot(ItemStack.of(slotTag), slotTag.getInt("x"), slotTag.getInt("y")));
+            ValueInput slotTag = input.childOrEmpty("slot" + i);
+            items.set(i, new Slot(slotTag.read("stack", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY), slotTag.getIntOr("x", 0), slotTag.getIntOr("y", 0)));
         }
-        plantMatterStack = ItemStack.of(tag.getCompound("plantMatterStack"));
-        plantMatter = tag.getInt("plantMatter");
-        containerStack = ItemStack.of(tag.getCompound("containerStack"));
-        bulbStack = ItemStack.of(tag.getCompound("bulbStack"));
-        tankStack = ItemStack.of(tag.getCompound("tankStack"));
-        nestStack = ItemStack.of(tag.getCompound("nestStack"));
-        lidStack = ItemStack.of(tag.getCompound("lidStack"));
-        baseStack = ItemStack.of(tag.getCompound("baseStack"));
-        armStack = ItemStack.of(tag.getCompound("armStack"));
-        energyContainer.deserialize(tag.getCompound("energy"));
+        plantMatterStack = input.read("plantMatterStack", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        plantMatter = input.getIntOr("plantMatter", 0);
+        containerStack = input.read("containerStack", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        bulbStack = input.read("bulbStack", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        tankStack = input.read("tankStack", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        nestStack = input.read("nestStack", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        lidStack = input.read("lidStack", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        baseStack = input.read("baseStack", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        armStack = input.read("armStack", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        getEnergyHandler().deserialize(input.childOrEmpty("energy"));
     }
 
     public ItemStack getNestStack() {
@@ -298,7 +283,7 @@ public class IncubatorBlockEntity extends SyncingContainerBlockEntity implements
     }
 
     public void tick(Level world, BlockPos pos, BlockState pState, IncubatorBlockEntity be) {
-        if (!world.isClientSide) {
+        if (!world.isClientSide()) {
             if (!be.getItem(9).isEmpty()) {
                 if (be.plantMatter < be.getMaxPlantMatter()) {
                     be.plantMatter += 1;
@@ -308,7 +293,7 @@ public class IncubatorBlockEntity extends SyncingContainerBlockEntity implements
             }
             if (level.getGameTime() % getTicksPerPercent() == 0)
                 if (be.items.stream().anyMatch(slot -> !slot.stack.isEmpty())) {
-                    getEnergyStorage().internalExtract(calculateEnergyConsumption(),true);
+                    getEnergyHandler().internalExtract(calculateEnergyConsumption(),true);
                     for (int i = 0; i < be.getSlotCount(); i++) {
                         Slot slot = be.items.get(i);
                         if (!slot.stack.isEmpty() && slot.stack.is(ItemInit.UNINCUBATED_EGG.get())) {
@@ -358,8 +343,8 @@ public class IncubatorBlockEntity extends SyncingContainerBlockEntity implements
         return c;
     }
     @Override
-    public WrappedBlockEnergyContainer getEnergyStorage() {
-        return energyContainer == null ? this.energyContainer = new WrappedBlockEnergyContainer(this, new InsertOnlyEnergyContainer(1000,1000)) : this.energyContainer;
+    public MachineEnergyHandler getEnergyHandler() {
+        return energyHandler == null ? this.energyHandler = new MachineEnergyHandler(1000, 1000, 0, this::setChanged) : this.energyHandler;
     }
 
     @Override
@@ -390,6 +375,31 @@ public class IncubatorBlockEntity extends SyncingContainerBlockEntity implements
 
         public Slot withY(int y) {
             return new Slot(stack, x, y);
+        }
+    }
+
+    @Override
+    protected net.minecraft.core.NonNullList<ItemStack> getItems() {
+        NonNullList<ItemStack> items = NonNullList.withSize(getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < items.size(); i++) {
+            items.set(i, getItem(i));
+        }
+        return items;
+    }
+
+    @Override
+    protected void setItems(NonNullList<ItemStack> items) {
+        for (int i = 0; i < Math.min(items.size(), getContainerSize()); i++) {
+            setItem(i, items.get(i));
+        }
+    }
+
+    // 26.2: machine-part items are dropped here instead of in the old Block#onRemove
+    @Override
+    public void preRemoveSideEffects(net.minecraft.core.BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
+        super.preRemoveSideEffects(pos, state);
+        if (this.level != null) {
+            net.minecraft.world.Containers.dropContents(this.level, pos, this.getMachineParts());
         }
     }
 }

@@ -1,21 +1,47 @@
 package net.dumbcode.projectnublar.api;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.dumbcode.projectnublar.ProjectNublar;
 import net.dumbcode.projectnublar.Constants;
+import net.dumbcode.projectnublar.init.DataComponentInit;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.animal.TropicalFish;
+import net.minecraft.world.entity.animal.fish.TropicalFish;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
+import java.util.Optional;
 
 public class DNAData {
+
+    public static final Codec<DNAData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        BuiltInRegistries.ENTITY_TYPE.byNameCodec().fieldOf("entityType").forGetter(DNAData::getEntityType),
+        Codec.DOUBLE.optionalFieldOf("dnaPercentage", 0.0).forGetter(DNAData::getDnaPercentage),
+        Codec.STRING.optionalFieldOf("variant").forGetter(dna -> Optional.ofNullable(dna.getVariant())),
+        Codec.STRING.optionalFieldOf("fossilPiece").forGetter(dna -> Optional.ofNullable(dna.getFossilPiece()).map(FossilPiece::name)),
+        Codec.STRING.optionalFieldOf("quality").forGetter(dna -> Optional.ofNullable(dna.getQuality()).map(Quality::getName)),
+        Codec.BOOL.optionalFieldOf("isEmbryo", false).forGetter(DNAData::isEmbryo)
+    ).apply(instance, (entityType, dnaPercentage, variant, fossilPiece, quality, isEmbryo) -> {
+        DNAData dnaData = new DNAData();
+        dnaData.setEntityType(entityType);
+        dnaData.setDnaPercentage(dnaPercentage);
+        variant.ifPresent(dnaData::setVariant);
+        fossilPiece.map(FossilPieces::getPieceByName).ifPresent(dnaData::setFossilPiece);
+        quality.map(Quality::byName).ifPresent(dnaData::setQuality);
+        dnaData.setEmbryo(isEmbryo);
+        return dnaData;
+    }));
+
+    public static final StreamCodec<io.netty.buffer.ByteBuf, DNAData> STREAM_CODEC = ByteBufCodecs.fromCodec(CODEC);
     private EntityType<?> entityType;
     private double dnaPercentage;
     private String variant;
@@ -102,8 +128,8 @@ public class DNAData {
     }
 
     public static void createTooltip(ItemStack stack, List<Component> tooltip) {
-        if (stack.hasTag()) {
-            DNAData dnaData = loadFromNBT(stack.getTag().getCompound("DNAData"));
+        DNAData dnaData = stack.get(DataComponentInit.DNA_DATA.get());
+        if (dnaData != null) {
             tooltip.add(dnaData.getFormattedType());
             if (dnaData.getDnaPercentage() != 0)
                 tooltip.add(dnaData.getFormattedDNA());
@@ -143,7 +169,7 @@ public class DNAData {
             if (entityType.getDescription().getString().toLowerCase().contains("parrot"))
                 localVariant = ProjectNublar.checkReplace(variant);
             else if (entityType.getDescription().getString().toLowerCase().contains("cat"))
-                localVariant = ProjectNublar.checkReplace(new ResourceLocation(variant).getPath());
+                localVariant = ProjectNublar.checkReplace(Identifier.parse(variant).getPath());
         }
         return Component.literal(localVariant + getEntityType().getDescription().getString());
     }
@@ -177,22 +203,18 @@ public class DNAData {
 
     public static DNAData loadFromNBT(CompoundTag tag) {
         DNAData dnaData = new DNAData();
-        dnaData.setEntityType(BuiltInRegistries.ENTITY_TYPE.get(new ResourceLocation(tag.getString("entityType"))));
-        if (tag.contains("dnaPercentage"))
-            dnaData.setDnaPercentage(tag.getDouble("dnaPercentage"));
-        if (tag.contains("variant"))
-            dnaData.setVariant(tag.getString("variant"));
-        if (tag.contains("fossilPiece"))
-            dnaData.setFossilPiece(FossilPieces.getPieceByName(tag.getString("fossilPiece")));
-        if (tag.contains("quality"))
-            dnaData.setQuality(Quality.byName(tag.getString("quality")));
-        dnaData.setEmbryo(tag.getBoolean("isEmbryo"));
+        tag.getString("entityType").map(Identifier::parse).map(BuiltInRegistries.ENTITY_TYPE::getValue).ifPresent(dnaData::setEntityType);
+        tag.getDouble("dnaPercentage").ifPresent(dnaData::setDnaPercentage);
+        tag.getString("variant").ifPresent(dnaData::setVariant);
+        tag.getString("fossilPiece").map(FossilPieces::getPieceByName).ifPresent(dnaData::setFossilPiece);
+        tag.getString("quality").map(Quality::byName).ifPresent(dnaData::setQuality);
+        dnaData.setEmbryo(tag.getBooleanOr("isEmbryo", false));
         return dnaData;
     }
 
     public static DNAData fromDrive(ItemStack stack, EntityType<?> entityType) {
 
-        return loadFromNBT(stack.getTag().getCompound("DNAData"));
+        return stack.get(DataComponentInit.DNA_DATA.get());
     }
 
     public static String createStorageKey(EntityType<?> entityType, String variant) {
@@ -201,5 +223,25 @@ public class DNAData {
 
     public DinoData.EntityInfo getEntityInfo() {
         return new DinoData.EntityInfo(entityType, variant);
+    }
+
+    // 26.2: data components must implement equals/hashCode (registration validation crashes otherwise)
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (!(obj instanceof DNAData other)) return false;
+        return Double.compare(dnaPercentage, other.dnaPercentage) == 0
+                && isEmbryo == other.isEmbryo
+                && java.util.Objects.equals(entityType, other.entityType)
+                && java.util.Objects.equals(variant, other.variant)
+                && fossilPiece == other.fossilPiece
+                && quality == other.quality
+                && tFish1 == other.tFish1
+                && tFish2 == other.tFish2;
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(entityType, dnaPercentage, variant, fossilPiece, quality, isEmbryo, tFish1, tFish2);
     }
 }

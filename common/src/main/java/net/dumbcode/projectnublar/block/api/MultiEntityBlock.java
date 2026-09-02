@@ -46,8 +46,16 @@ public abstract class MultiEntityBlock extends BaseEntityBlock implements MultiB
         this.depth = depth;
     }
 
-    public InteractionResult use(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
-        if (pLevel.isClientSide) {
+    // 26.2: multiblock blocks have no Properties-only ctor; the codec is only used for
+    // block-state serialization, which never re-creates these blocks
+    @Override
+    public com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return com.mojang.serialization.MapCodec.unit(this);
+    }
+
+    @Override
+    protected InteractionResult useWithoutItem(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, BlockHitResult pHit) {
+        if (pLevel.isClientSide()) {
             return InteractionResult.SUCCESS;
         } else {
             BlockPos corePos = MultiBlock.getCorePos(pState, pPos);
@@ -90,23 +98,15 @@ public abstract class MultiEntityBlock extends BaseEntityBlock implements MultiB
     }
     @Override
     public RenderShape getRenderShape(BlockState state) {
-        return RenderShape.ENTITYBLOCK_ANIMATED;
+        // 26.2: ENTITYBLOCK_ANIMATED is gone; the machine model is drawn by its GeoBlockRenderer
+        return RenderShape.INVISIBLE;
     }
 
-    public void onRemove(BlockState pState, Level pLevel, BlockPos pPos, BlockState pNewState, boolean pIsMoving) {
-        if (pState.getValue(ROWS) == 0 && pState.getValue(COLUMNS) == 0 && pState.getValue(DEPTH) == 0) {
-            if (!pState.is(pNewState.getBlock())) {
-                BlockEntity blockentity = pLevel.getBlockEntity(pPos);
-                if (blockentity instanceof Container) {
-                    Containers.dropContents(pLevel, pPos, (Container) blockentity);
-                    pLevel.updateNeighbourForOutputSignal(pPos, this);
-                }
-                if(blockentity instanceof IMachineParts){
-                    Containers.dropContents(pLevel, pPos, ((IMachineParts) blockentity).getMachineParts());
-                }
-
-            }
-        }
+    // 26.2: onRemove is gone. Container contents are dropped by the block entity's
+    // preRemoveSideEffects (machine-part items drop there too); this hook only breaks the
+    // remaining multiblock parts after the core is removed.
+    @Override
+    protected void affectNeighborsAfterRemoval(BlockState pState, net.minecraft.server.level.ServerLevel pLevel, BlockPos pPos, boolean pIsMoving) {
         //break the other blocks
         Direction direction = pState.getValue(FACING);
         BlockPos corePos = pPos.relative(direction, pState.getValue(DEPTH)).relative(direction.getClockWise(), pState.getValue(COLUMNS)).relative(Direction.UP, -pState.getValue(ROWS));
@@ -122,8 +122,7 @@ public abstract class MultiEntityBlock extends BaseEntityBlock implements MultiB
             }
         }
 
-
-        super.onRemove(pState, pLevel, pPos, pNewState, pIsMoving);
+        super.affectNeighborsAfterRemoval(pState, pLevel, pPos, pIsMoving);
     }
 
 

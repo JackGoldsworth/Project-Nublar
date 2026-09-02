@@ -1,19 +1,20 @@
 package net.dumbcode.projectnublar.init;
 
-import dev.architectury.registry.registries.DeferredRegister;
-import dev.architectury.registry.registries.DeferredSupplier;
+import net.dumbcode.projectnublar.platform.DeferredRegister;
+import net.dumbcode.projectnublar.platform.DeferredHolder;
+import net.dumbcode.projectnublar.platform.DeferredHolder;
 import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.api.*;
 import net.dumbcode.projectnublar.entity.dinosaur.Dinosaur;
-import net.minecraft.client.Minecraft;
+import net.dumbcode.projectnublar.client.CreativeTabClientHelper;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.animal.Parrot;
+import net.minecraft.world.entity.animal.parrot.Parrot;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
@@ -23,8 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CreativeTabInit {
-    public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Constants.MODID, Registries.CREATIVE_MODE_TAB);
-    public static final DeferredSupplier<CreativeModeTab> FOSSIL_ORES_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_fossil_ores", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
+    public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, Constants.MODID);
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> FOSSIL_ORES_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_fossil_ores", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
             .title(Component.translatable("itemGroup." + Constants.MODID + ".fossil_ores"))
             .icon(() -> {
                 Block block = FossilCollection.COLLECTIONS.get("projectnublar:tyrannosaurus_rex").fossilblocks().get(Blocks.STONE).get(Quality.PRISTINE).get(FossilPieces.getPieceByName("rex_skull")).get();
@@ -52,7 +53,7 @@ public class CreativeTabInit {
                         });
                     })
             .build());
-    public static final DeferredSupplier<CreativeModeTab> MACHINES_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_machines", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> MACHINES_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_machines", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
             .title(Component.translatable("itemGroup." + Constants.MODID + ".machines"))
             .icon(() -> new ItemStack(BlockInit.PROCESSOR.get()))
             .displayItems(
@@ -74,7 +75,7 @@ public class CreativeTabInit {
                         
                     })
             .build());
-    public static final DeferredSupplier<CreativeModeTab> MISC_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_misc", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> MISC_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_misc", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
             .title(Component.translatable("itemGroup." + Constants.MODID + ".misc"))
             .icon(() -> new ItemStack(ItemInit.IRON_FILTER.get()))
             .displayItems(
@@ -104,64 +105,60 @@ public class CreativeTabInit {
                     })
             .build());
 
-    public static final DeferredSupplier<CreativeModeTab> DNA_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_dna", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> DNA_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_dna", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
             .title(Component.translatable("itemGroup." + Constants.MODID + ".dna"))
             .icon(() -> new ItemStack(ItemInit.TEST_TUBE_ITEM.get()))
             .displayItems(
                     (itemDisplayParameters, output) -> {
                         output.accept(ItemInit.TEST_TUBE_ITEM.get());
-                        EntityInit.ENTITIES.forEach(type ->  {
+                        EntityInit.ENTITIES.getEntries().forEach(type ->  {
                             ItemStack stack = new ItemStack(ItemInit.TEST_TUBE_ITEM.get());
                             DNAData dnaData = new DNAData();
                             dnaData.setEntityType(type.get());
                             dnaData.setDnaPercentage(0.5);
-                            stack.getOrCreateTag().put("DNAData", dnaData.saveToNBT(new CompoundTag()));
+                            stack.set(DataComponentInit.DNA_DATA.get(), dnaData);
                             output.accept(stack);
                         });
                     })
             .build());
 
-    public static final DeferredSupplier<CreativeModeTab> SYRINGE_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_syringe", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> SYRINGE_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_syringe", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
             .title(Component.translatable("itemGroup." + Constants.MODID + ".syringe"))
             .icon(() -> new ItemStack(ItemInit.SYRINGE.get()))
             .displayItems(
                     (itemDisplayParameters, output) -> {
                         output.accept(ItemInit.SYRINGE.get());
-                        for (ResourceLocation entry : BuiltInRegistries.ENTITY_TYPE.keySet()) {
+                        for (Identifier entry : BuiltInRegistries.ENTITY_TYPE.keySet()) {
                             if (entry.getPath().contains("parrot")) {
                                 for (Parrot.Variant variant : Parrot.Variant.values()) {
                                     ItemStack stack = new ItemStack(ItemInit.SYRINGE.get());
                                     DNAData dnaData = new DNAData();
-                                    dnaData.setEntityType(BuiltInRegistries.ENTITY_TYPE.get(entry));
+                                    dnaData.setEntityType(BuiltInRegistries.ENTITY_TYPE.getValue(entry));
                                     dnaData.setVariant(variant.getSerializedName());
                                     dnaData.setDnaPercentage(1.0);
-                                    stack.getOrCreateTag().put("DNAData", dnaData.saveToNBT(new CompoundTag()));
+                                    stack.set(DataComponentInit.DNA_DATA.get(), dnaData);
                                     output.accept(stack);
                                 }
                             } else if (entry.getPath().contains("cat")) {
-                                BuiltInRegistries.CAT_VARIANT.keySet().forEach((catVariant) -> {
+                                itemDisplayParameters.holders().lookupOrThrow(Registries.CAT_VARIANT).listElementIds().forEach((catVariant) -> {
                                     ItemStack stack = new ItemStack(ItemInit.SYRINGE.get());
                                     DNAData dnaData = new DNAData();
-                                    dnaData.setEntityType(BuiltInRegistries.ENTITY_TYPE.get(entry));
-                                    dnaData.setVariant(catVariant.toString());
+                                    dnaData.setEntityType(BuiltInRegistries.ENTITY_TYPE.getValue(entry));
+                                    dnaData.setVariant(catVariant.identifier().toString());
                                     dnaData.setDnaPercentage(0.5);
-                                    stack.getOrCreateTag().put("DNAData", dnaData.saveToNBT(new CompoundTag()));
+                                    stack.set(DataComponentInit.DNA_DATA.get(), dnaData);
                                     output.accept(stack);
                                 });
                             } else {
-                                if(BuiltInRegistries.ENTITY_TYPE.get(entry).create(Minecraft.getInstance().level) instanceof LivingEntity) {
-                                    ItemStack stack = new ItemStack(ItemInit.SYRINGE.get());
-                                    DNAData dnaData = new DNAData();
-                                    dnaData.setEntityType(BuiltInRegistries.ENTITY_TYPE.get(entry));
-                                    dnaData.setDnaPercentage(0.5);
-                                    stack.getOrCreateTag().put("DNAData", dnaData.saveToNBT(new CompoundTag()));
+                                ItemStack stack = CreativeTabClientHelper.createSyringeStackIfLiving(entry);
+                                if (!stack.isEmpty()) {
                                     output.accept(stack);
                                 }
                             }
                         }
                     })
             .build());
-    public static final DeferredSupplier<CreativeModeTab> EGG_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_egg", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EGG_TAB = CREATIVE_MODE_TABS.register(Constants.MODID + "_egg", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
             .title(Component.translatable("itemGroup." + Constants.MODID + ".egg"))
             .icon(() -> new ItemStack(ItemInit.ARTIFICIAL_EGG.get()))
             .displayItems(
@@ -204,7 +201,7 @@ public class CreativeTabInit {
         return dinoEggs;
     }
 
-    public static void loadClass() {
+    public static void registerTo() {
         CREATIVE_MODE_TABS.register();
     }
 }

@@ -1,25 +1,28 @@
 package net.dumbcode.projectnublar.network.c2s;
 
-import commonnetwork.networking.data.PacketContext;
 import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.block.entity.IncubatorBlockEntity;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.dumbcode.projectnublar.network.PacketContext;
 
-public record UpdateIncubatorPacket(BlockPos pos) {
-    public static ResourceLocation ID = Constants.modLoc("update_incubator");
-    public static UpdateIncubatorPacket decode(FriendlyByteBuf buf) {
-        return new UpdateIncubatorPacket(buf.readBlockPos());
+public record UpdateIncubatorPacket(BlockPos pos) implements CustomPacketPayload {
+    public static final Type<UpdateIncubatorPacket> TYPE = new Type<>(Constants.modLoc("update_incubator"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, UpdateIncubatorPacket> STREAM_CODEC = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, UpdateIncubatorPacket::pos, UpdateIncubatorPacket::new);
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeBlockPos(pos());
-    }
-    public static void handle(PacketContext<UpdateIncubatorPacket> context) {
-        context.sender().getServer().execute(() -> {
-            BlockPos pos = context.message().pos();
-            IncubatorBlockEntity entity = (IncubatorBlockEntity) context.sender().level().getBlockEntity(pos);
-            entity.updateBlock();
+
+    public static void handle(UpdateIncubatorPacket payload, PacketContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().level().getBlockEntity(payload.pos()) instanceof IncubatorBlockEntity entity) {
+                entity.updateBlock();
+            }
         });
     }
 }

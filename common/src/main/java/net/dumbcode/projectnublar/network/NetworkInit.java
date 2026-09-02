@@ -1,14 +1,14 @@
 package net.dumbcode.projectnublar.network;
 
-import commonnetwork.api.Network;
 import net.dumbcode.projectnublar.network.c2s.UpdateEditInfoPacket;
 import net.dumbcode.projectnublar.network.c2s.UpdateIncubatorPacket;
 import net.dumbcode.projectnublar.network.c2s.UpdateIncubatorSlotPacket;
+import net.dumbcode.projectnublar.platform.Services;
 
 public class NetworkInit {
-    public static void registerPackets(){
-        Network.registerPacket(UpdateEditInfoPacket.ID, UpdateEditInfoPacket.class,UpdateEditInfoPacket::encode, UpdateEditInfoPacket::decode, UpdateEditInfoPacket::handle);
-        Network.registerPacket(UpdateIncubatorSlotPacket.ID, UpdateIncubatorSlotPacket.class, UpdateIncubatorSlotPacket::encode, UpdateIncubatorSlotPacket::decode, UpdateIncubatorSlotPacket::handle);
-        Network.registerPacket(UpdateIncubatorPacket.ID, UpdateIncubatorPacket.class, UpdateIncubatorPacket::encode, UpdateIncubatorPacket::decode, UpdateIncubatorPacket::handle);
+    public static void registerPackets() {
+        Services.PLATFORM.registerServerboundPacket(UpdateEditInfoPacket.TYPE, UpdateEditInfoPacket.STREAM_CODEC, UpdateEditInfoPacket::handle);
+        Services.PLATFORM.registerServerboundPacket(UpdateIncubatorSlotPacket.TYPE, UpdateIncubatorSlotPacket.STREAM_CODEC, UpdateIncubatorSlotPacket::handle);
+        Services.PLATFORM.registerServerboundPacket(UpdateIncubatorPacket.TYPE, UpdateIncubatorPacket.STREAM_CODEC, UpdateIncubatorPacket::handle);
     }
 }

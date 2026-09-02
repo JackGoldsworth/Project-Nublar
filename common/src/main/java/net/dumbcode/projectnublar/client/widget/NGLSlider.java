@@ -1,17 +1,17 @@
 package net.dumbcode.projectnublar.client.widget;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import org.lwjgl.glfw.GLFW;
 
 import java.text.DecimalFormat;
 
 public class NGLSlider extends AbstractSliderButton {
-    public static final ResourceLocation SLIDER_LOCATION = new ResourceLocation("textures/gui/slider.png");
+    public static final Identifier SLIDER_LOCATION = Identifier.parse("textures/gui/slider.png");
     protected Component prefix;
     protected Component suffix;
 
@@ -89,15 +89,15 @@ public class NGLSlider extends AbstractSliderButton {
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY) {
-        this.setValueFromMouse(mouseX);
+    public void onClick(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        this.setValueFromMouse(event.x());
     }
 
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        boolean flag = keyCode == GLFW.GLFW_KEY_LEFT;
-        if (flag || keyCode == GLFW.GLFW_KEY_RIGHT) {
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        boolean flag = event.key() == GLFW.GLFW_KEY_LEFT;
+        if (flag || event.key() == GLFW.GLFW_KEY_RIGHT) {
             if (this.minValue > this.maxValue)
                 flag = !flag;
             float f = flag ? -1F : 1F;
@@ -111,8 +111,8 @@ public class NGLSlider extends AbstractSliderButton {
     }
 
     @Override
-    protected void onDrag(double mouseX, double $$1, double $$2, double $$3) {
-        this.setValueFromMouse(mouseX);
+    protected void onDrag(net.minecraft.client.input.MouseButtonEvent event, double $$2, double $$3) {
+        this.setValueFromMouse(event.x());
     }
 
     protected void setValueFromMouse(double mouseX) {
@@ -171,7 +171,7 @@ public class NGLSlider extends AbstractSliderButton {
     }
 
     @Override
-    public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         final Minecraft mc = Minecraft.getInstance();
         renderSliderBackground(guiGraphics);
 
@@ -180,11 +180,11 @@ public class NGLSlider extends AbstractSliderButton {
         renderScrollingString(guiGraphics, mc.font, 2, (this.active ? 16777215 : 10526880) | Mth.ceil(this.alpha * 255.0F) << 24);
     }
 
-    public void renderSliderBar(GuiGraphics guiGraphics) {
+    public void renderSliderBar(GuiGraphicsExtractor guiGraphics) {
         GuiHelper.blitWithBorder(guiGraphics, SLIDER_LOCATION, this.getX() + (int) (this.value * (double) (this.width - 8)), this.getY(), 0, getHandleTextureY(), 8, this.height, 200, 20, 2, 3, 2, 2);
     }
 
-    public void renderSliderBackground(GuiGraphics guiGraphics) {
+    public void renderSliderBackground(GuiGraphicsExtractor guiGraphics) {
         GuiHelper.blitWithBorder(guiGraphics, SLIDER_LOCATION, this.getX(), this.getY(), 0, getTextureY(), this.width, this.height, 200, 20, 2, 3, 2, 2);
     }
 

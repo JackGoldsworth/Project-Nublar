@@ -1,6 +1,6 @@
 package net.dumbcode.projectnublar.api;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,7 +58,7 @@ public class FossilPieces {
         return TRICERATOPS_PIECES;
     }
     //overload to register common piece
-    public static List<FossilPiece> getPiecesByEntityType(ResourceLocation pType) {
+    public static List<FossilPiece> getPiecesByEntityType(Identifier pType) {
         if (pType.getPath().equals("tyrannosaurus_rex")) {
             return getTyrannosaurPieces();
         }

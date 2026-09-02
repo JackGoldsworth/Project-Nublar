@@ -1,13 +1,13 @@
 package net.dumbcode.projectnublar.block.entity;
 
-import earth.terrarium.botarium.common.energy.base.BotariumEnergyBlock;
-import earth.terrarium.botarium.common.energy.impl.InsertOnlyEnergyContainer;
-import earth.terrarium.botarium.common.energy.impl.WrappedBlockEnergyContainer;
 import net.dumbcode.projectnublar.api.DNAData;
 import net.dumbcode.projectnublar.api.DinoData;
 import net.dumbcode.projectnublar.block.api.IMachineParts;
+import net.dumbcode.projectnublar.block.api.MachineEnergyHandler;
+import net.dumbcode.projectnublar.block.api.NublarEnergyBlock;
 import net.dumbcode.projectnublar.block.api.SyncingContainerBlockEntity;
 import net.dumbcode.projectnublar.init.BlockInit;
+import net.dumbcode.projectnublar.init.DataComponentInit;
 import net.dumbcode.projectnublar.init.ItemInit;
 import net.dumbcode.projectnublar.init.TagInit;
 import net.dumbcode.projectnublar.item.ComputerChipItem;
@@ -17,7 +17,6 @@ import net.dumbcode.projectnublar.menutypes.SequencerMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
@@ -28,14 +27,18 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import software.bernie.geckolib.animatable.GeoBlockEntity;
-import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.core.animation.AnimatableManager;
-import software.bernie.geckolib.util.GeckoLibUtil;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import com.geckolib.animatable.GeoBlockEntity;
+import com.geckolib.animatable.instance.AnimatableInstanceCache;
+import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.util.GeckoLibUtil;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-public class SequencerBlockEntity extends SyncingContainerBlockEntity implements GeoBlockEntity, IMachineParts, BotariumEnergyBlock<WrappedBlockEnergyContainer> {
+public class SequencerBlockEntity extends SyncingContainerBlockEntity implements GeoBlockEntity, IMachineParts, NublarEnergyBlock {
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     private ItemStack storage = ItemStack.EMPTY;
     private ItemStack dna_input = ItemStack.EMPTY;
@@ -59,7 +62,7 @@ public class SequencerBlockEntity extends SyncingContainerBlockEntity implements
     private DinoData dinoData = new DinoData();
     private boolean isSynthesizing = false;
     private int synthTime = 0;
-    private WrappedBlockEnergyContainer energyContainer;
+    private MachineEnergyHandler energyHandler;
 
     protected final ContainerData dataAccess = new ContainerData() {
         public int get(int slot) {
@@ -152,15 +155,16 @@ public class SequencerBlockEntity extends SyncingContainerBlockEntity implements
     }
 
     public void tick(Level world, BlockPos pos, BlockState pState, SequencerBlockEntity be) {
-        if (!world.isClientSide) {
+        if (!world.isClientSide()) {
             boolean shouldUpdate = false;
-            if (!storage.isEmpty() && !dna_input.isEmpty() && dna_input.hasTag() && ((empty_vial_output.isEmpty() || empty_vial_output.is(dna_input.getItem())) || empty_vial_output.getCount() < 64)) {
+            if (!storage.isEmpty() && !dna_input.isEmpty() && dna_input.has(DataComponentInit.DNA_DATA.get()) && ((empty_vial_output.isEmpty() || empty_vial_output.is(dna_input.getItem())) || empty_vial_output.getCount() < 64)) {
                 double currentPercent = 0;
-                DNAData dnaData = DNAData.loadFromNBT(dna_input.getTag().getCompound("DNAData"));
+                DNAData dnaData = dna_input.get(DataComponentInit.DNA_DATA.get());
                 String storageName = dnaData.getStorageName();
                 DNAData storedDNA = null;
-                if (storage.getOrCreateTag().contains(dnaData.getStorageName())) {
-                    storedDNA = DNAData.loadFromNBT(storage.getTag().getCompound(storageName));
+                Map<String, DNAData> stored = storage.getOrDefault(DataComponentInit.DISK_DNA.get(), Map.of());
+                if (stored.containsKey(dnaData.getStorageName())) {
+                    storedDNA = stored.get(dnaData.getStorageName());
                     currentPercent = storedDNA.getDnaPercentage();
                 }
                 if (currentPercent < 1) {
@@ -171,12 +175,13 @@ public class SequencerBlockEntity extends SyncingContainerBlockEntity implements
                         } else {
                             empty_vial_output.grow(1);
                         }
+                        Map<String, DNAData> updated = new HashMap<>(stored);
                         if (storedDNA != null) {
-                            DNAData combinedDNA = DNAData.combineDNA(storedDNA, dnaData);
-                            storage.getOrCreateTag().put(storageName, combinedDNA.saveToNBT(new CompoundTag()));
+                            updated.put(storageName, DNAData.combineDNA(storedDNA, dnaData));
                         } else {
-                            storage.getOrCreateTag().put(storageName, dnaData.saveToNBT(new CompoundTag()));
+                            updated.put(storageName, dnaData);
                         }
+                        storage.set(DataComponentInit.DISK_DNA.get(), updated);
 
                         dna_input.shrink(1);
                         sequencingTime = 0;
@@ -209,11 +214,11 @@ public class SequencerBlockEntity extends SyncingContainerBlockEntity implements
             }
             if(isSynthesizing && canSynth()){
                 synthTime++;
-                getEnergyStorage().internalExtract(calculateEnergyConsumption(),true);
+                getEnergyHandler().internalExtract(calculateEnergyConsumption(),true);
                 if(synthTime > getMaxSynthTime()){
                     synthTime = 0;
                     dna_test_tube_output = new ItemStack(ItemInit.TEST_TUBE_ITEM.get());
-                    dna_test_tube_output.getOrCreateTag().put("DinoData", dinoData.toNBT());
+                    dinoData.toStack(dna_test_tube_output);
                     waterLevel -= 500;
                     boneMatterLevel -= 8;
                     sugarLevel -= 8;
@@ -239,60 +244,60 @@ public class SequencerBlockEntity extends SyncingContainerBlockEntity implements
         return c;
     }
     @Override
-    public WrappedBlockEnergyContainer getEnergyStorage() {
-        return energyContainer == null ? this.energyContainer = new WrappedBlockEnergyContainer(this, new InsertOnlyEnergyContainer(1000,1000)) : this.energyContainer;
+    public MachineEnergyHandler getEnergyHandler() {
+        return energyHandler == null ? this.energyHandler = new MachineEnergyHandler(1000, 1000, 0, this::setChanged) : this.energyHandler;
     }
 
     @Override
-    protected void saveData(CompoundTag tag) {
-        tag.put("storage", storage.save(new CompoundTag()));
-        tag.put("dna_input", dna_input.save(new CompoundTag()));
-        tag.put("empty_vial_output", empty_vial_output.save(new CompoundTag()));
-        tag.put("water", water.save(new CompoundTag()));
-        tag.put("bone_matter", bone_matter.save(new CompoundTag()));
-        tag.put("sugar", sugar.save(new CompoundTag()));
-        tag.put("plant_matter", plant_matter.save(new CompoundTag()));
-        tag.put("empty_tube_input", empty_tube_input.save(new CompoundTag()));
-        tag.put("dna_test_tube_output", dna_test_tube_output.save(new CompoundTag()));
-        tag.putFloat("sequencingTime", sequencingTime);
-        tag.putBoolean("hasComputer", hasComputer);
-        tag.putBoolean("hasDoor", hasDoor);
-        tag.putBoolean("hasScreen", hasScreen);
-        tag.putInt("waterLevel", waterLevel);
-        tag.putInt("boneMatterLevel", boneMatterLevel);
-        tag.putInt("sugarLevel", sugarLevel);
-        tag.putInt("plantMatterLevel", plantMatterLevel);
-        tag.put("DinoData", dinoData.toNBT());
-        tag.putBoolean("isSynthesizing", isSynthesizing);
-        tag.putInt("synthTime", synthTime);
-        tag.put("computer_chip", computer_chip.save(new CompoundTag()));
-        tag.put("tank", tank.save(new CompoundTag()));
+    protected void saveData(ValueOutput output) {
+        output.store("storage", ItemStack.OPTIONAL_CODEC, storage);
+        output.store("dna_input", ItemStack.OPTIONAL_CODEC, dna_input);
+        output.store("empty_vial_output", ItemStack.OPTIONAL_CODEC, empty_vial_output);
+        output.store("water", ItemStack.OPTIONAL_CODEC, water);
+        output.store("bone_matter", ItemStack.OPTIONAL_CODEC, bone_matter);
+        output.store("sugar", ItemStack.OPTIONAL_CODEC, sugar);
+        output.store("plant_matter", ItemStack.OPTIONAL_CODEC, plant_matter);
+        output.store("empty_tube_input", ItemStack.OPTIONAL_CODEC, empty_tube_input);
+        output.store("dna_test_tube_output", ItemStack.OPTIONAL_CODEC, dna_test_tube_output);
+        output.putFloat("sequencingTime", sequencingTime);
+        output.putBoolean("hasComputer", hasComputer);
+        output.putBoolean("hasDoor", hasDoor);
+        output.putBoolean("hasScreen", hasScreen);
+        output.putInt("waterLevel", waterLevel);
+        output.putInt("boneMatterLevel", boneMatterLevel);
+        output.putInt("sugarLevel", sugarLevel);
+        output.putInt("plantMatterLevel", plantMatterLevel);
+        output.store("DinoData", DinoData.CODEC, dinoData);
+        output.putBoolean("isSynthesizing", isSynthesizing);
+        output.putInt("synthTime", synthTime);
+        output.store("computer_chip", ItemStack.OPTIONAL_CODEC, computer_chip);
+        output.store("tank", ItemStack.OPTIONAL_CODEC, tank);
     }
 
     @Override
-    protected void loadData(CompoundTag tag) {
-        storage = ItemStack.of(tag.getCompound("storage"));
-        dna_input = ItemStack.of(tag.getCompound("dna_input"));
-        empty_vial_output = ItemStack.of(tag.getCompound("empty_vial_output"));
-        water = ItemStack.of(tag.getCompound("water"));
-        bone_matter = ItemStack.of(tag.getCompound("bone_matter"));
-        sugar = ItemStack.of(tag.getCompound("sugar"));
-        plant_matter = ItemStack.of(tag.getCompound("plant_matter"));
-        empty_tube_input = ItemStack.of(tag.getCompound("empty_tube_input"));
-        dna_test_tube_output = ItemStack.of(tag.getCompound("dna_test_tube_output"));
-        sequencingTime = tag.getFloat("sequencingTime");
-        hasComputer = tag.getBoolean("hasComputer");
-        hasDoor = tag.getBoolean("hasDoor");
-        hasScreen = tag.getBoolean("hasScreen");
-        waterLevel = tag.getInt("waterLevel");
-        boneMatterLevel = tag.getInt("boneMatterLevel");
-        sugarLevel = tag.getInt("sugarLevel");
-        plantMatterLevel = tag.getInt("plantMatterLevel");
-        dinoData = DinoData.fromNBT(tag.getCompound("DinoData"));
-        isSynthesizing = tag.getBoolean("isSynthesizing");
-        synthTime = tag.getInt("synthTime");
-        computer_chip = ItemStack.of(tag.getCompound("computer_chip"));
-        tank = ItemStack.of(tag.getCompound("tank"));
+    protected void loadData(ValueInput input) {
+        storage = input.read("storage", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        dna_input = input.read("dna_input", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        empty_vial_output = input.read("empty_vial_output", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        water = input.read("water", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        bone_matter = input.read("bone_matter", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        sugar = input.read("sugar", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        plant_matter = input.read("plant_matter", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        empty_tube_input = input.read("empty_tube_input", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        dna_test_tube_output = input.read("dna_test_tube_output", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        sequencingTime = input.getFloatOr("sequencingTime", 0f);
+        hasComputer = input.getBooleanOr("hasComputer", false);
+        hasDoor = input.getBooleanOr("hasDoor", false);
+        hasScreen = input.getBooleanOr("hasScreen", false);
+        waterLevel = input.getIntOr("waterLevel", 0);
+        boneMatterLevel = input.getIntOr("boneMatterLevel", 0);
+        sugarLevel = input.getIntOr("sugarLevel", 0);
+        plantMatterLevel = input.getIntOr("plantMatterLevel", 0);
+        dinoData = input.read("DinoData", DinoData.CODEC).orElseGet(DinoData::new);
+        isSynthesizing = input.getBooleanOr("isSynthesizing", false);
+        synthTime = input.getIntOr("synthTime", 0);
+        computer_chip = input.read("computer_chip", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        tank = input.read("tank", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
     }
 
     @Override
@@ -489,7 +494,7 @@ public class SequencerBlockEntity extends SyncingContainerBlockEntity implements
                 sequencingTime = 0;
             }
             case 1 -> {
-                if(!ItemStack.isSameItemSameTags(dna_input, itemStack)) {
+                if(!ItemStack.isSameItemSameComponents(dna_input, itemStack)) {
                     sequencingTime = 0;
                 }
                 dna_input = itemStack;
@@ -526,7 +531,7 @@ public class SequencerBlockEntity extends SyncingContainerBlockEntity implements
         return cache;
     }
     public boolean canSynth(){
-        return !empty_tube_input.isEmpty() && plantMatterLevel >= 8 && sugarLevel >= 8 && boneMatterLevel >= 8 && waterLevel >= 500 && getEnergyStorage().getStoredEnergy() > calculateEnergyConsumption();
+        return !empty_tube_input.isEmpty() && plantMatterLevel >= 8 && sugarLevel >= 8 && boneMatterLevel >= 8 && waterLevel >= 500 && getEnergyHandler().getStoredEnergy() > calculateEnergyConsumption();
     }
     public void toggleSynth() {
         if(canSynth()) {
@@ -559,5 +564,30 @@ public class SequencerBlockEntity extends SyncingContainerBlockEntity implements
     public void setTank(ItemStack mainHandItem) {
         tank = mainHandItem;
         updateBlock();
+    }
+
+    @Override
+    protected net.minecraft.core.NonNullList<ItemStack> getItems() {
+        NonNullList<ItemStack> items = NonNullList.withSize(getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < items.size(); i++) {
+            items.set(i, getItem(i));
+        }
+        return items;
+    }
+
+    @Override
+    protected void setItems(NonNullList<ItemStack> items) {
+        for (int i = 0; i < Math.min(items.size(), getContainerSize()); i++) {
+            setItem(i, items.get(i));
+        }
+    }
+
+    // 26.2: machine-part items are dropped here instead of in the old Block#onRemove
+    @Override
+    public void preRemoveSideEffects(net.minecraft.core.BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
+        super.preRemoveSideEffects(pos, state);
+        if (this.level != null) {
+            net.minecraft.world.Containers.dropContents(this.level, pos, this.getMachineParts());
+        }
     }
 }

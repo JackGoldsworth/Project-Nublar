@@ -3,12 +3,11 @@ package net.dumbcode.projectnublar.block.api;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Doubles;
 import com.google.common.primitives.Floats;
-import earth.terrarium.botarium.common.energy.base.BotariumEnergyBlock;
 import net.dumbcode.projectnublar.util.LineUtils;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -203,30 +202,29 @@ public class Connection {
             .build();
     }
 
-    public CompoundTag writeToNBT(CompoundTag nbt) {
-        nbt.putString("id", this.type.getRegistryName().toString());
-        nbt.putDouble("offset", this.offset);
-        nbt.put("from", NbtUtils.writeBlockPos(this.getFrom()));
-            nbt.put("to", NbtUtils.writeBlockPos(this.getTo()));
-        nbt.putBoolean("sign", this.sign);
-        nbt.put("next", NbtUtils.writeBlockPos(this.next));
-        nbt.put("previous", NbtUtils.writeBlockPos(this.previous));
-        nbt.putBoolean("broken", this.broken);
-        return nbt;
+    public void writeData(ValueOutput output) {
+        output.putString("id", this.type.getRegistryName().toString());
+        output.putDouble("offset", this.offset);
+        output.store("from", BlockPos.CODEC, this.getFrom());
+        output.store("to", BlockPos.CODEC, this.getTo());
+        output.putBoolean("sign", this.sign);
+        output.store("next", BlockPos.CODEC, this.next);
+        output.store("previous", BlockPos.CODEC, this.previous);
+        output.putBoolean("broken", this.broken);
     }
 
 
-    public static Connection fromNBT(CompoundTag nbt, BlockEntity tileEntity) {
+    public static Connection fromData(ValueInput input, BlockEntity tileEntity) {
         return new Connection(
             tileEntity,
-            ConnectionType.getType(new ResourceLocation(nbt.getString("id"))),
-            nbt.getDouble("offset"),
-            NbtUtils.readBlockPos(nbt.getCompound("from")),
-            NbtUtils.readBlockPos(nbt.getCompound("to")),
-            NbtUtils.readBlockPos(nbt.getCompound("previous")),
-            NbtUtils.readBlockPos(nbt.getCompound("next")),
+            ConnectionType.getType(Identifier.parse(input.getStringOr("id", "minecraft:air"))),
+            input.getDoubleOr("offset", 0),
+            input.read("from", BlockPos.CODEC).orElse(BlockPos.ZERO),
+            input.read("to", BlockPos.CODEC).orElse(BlockPos.ZERO),
+            input.read("previous", BlockPos.CODEC).orElse(BlockPos.ZERO),
+            input.read("next", BlockPos.CODEC).orElse(BlockPos.ZERO),
             tileEntity.getBlockPos()
-        ).silentlySetBroken(nbt.getBoolean("broken")).setSign(nbt.getBoolean("sign"));
+        ).silentlySetBroken(input.getBooleanOr("broken", false)).setSign(input.getBooleanOr("sign", false));
     }
 
     public boolean lazyEquals(Connection con) {
@@ -270,7 +268,7 @@ public class Connection {
         //todo: energy
         for (BlockPos pos : Lists.newArrayList(this.from, this.to)) {
             BlockEntity te = world.getBlockEntity(pos);
-            if (te instanceof BotariumEnergyBlock wbec && wbec.getEnergyStorage().getStoredEnergy() > 0) {
+            if (te instanceof NublarEnergyBlock wbec && wbec.getEnergyHandler().getStoredEnergy() > 0) {
                 return true;
             }
         }

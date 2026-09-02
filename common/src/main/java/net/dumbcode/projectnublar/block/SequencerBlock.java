@@ -4,17 +4,18 @@ import net.dumbcode.projectnublar.block.api.MultiBlock;
 import net.dumbcode.projectnublar.block.api.MultiEntityBlock;
 import net.dumbcode.projectnublar.block.entity.SequencerBlockEntity;
 import net.dumbcode.projectnublar.client.ModShapes;
+import net.dumbcode.projectnublar.platform.Services;
 import net.dumbcode.projectnublar.init.BlockInit;
 import net.dumbcode.projectnublar.init.ItemInit;
 import net.dumbcode.projectnublar.item.ComputerChipItem;
 import net.dumbcode.projectnublar.item.TankItem;
-import net.dumbcode.projectnublar.platform.Services;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -37,9 +38,7 @@ public class SequencerBlock extends MultiEntityBlock {
     protected void openContainer(Level pLevel, BlockPos pPos, Player pPlayer) {
         BlockEntity blockentity = pLevel.getBlockEntity(pPos);
         if (blockentity instanceof SequencerBlockEntity) {
-                Services.PLATFORM.openMenu((ServerPlayer) pPlayer, (MenuProvider) blockentity, buf -> {
-                    ((FriendlyByteBuf) buf).writeBlockPos(pPos);
-                });
+            Services.PLATFORM.openMenu((ServerPlayer) pPlayer, (MenuProvider) blockentity, pPos);
                 //todo: add stat
 //            pPlayer.awardStat(getOpenState());
 
@@ -57,24 +56,24 @@ public class SequencerBlock extends MultiEntityBlock {
     }
 
     @Override
-    public InteractionResult use(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
-        if (!pLevel.isClientSide) {
+    public InteractionResult useItemOn(ItemStack pStack, BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
+        if (!pLevel.isClientSide()) {
             BlockEntity blockEntity = pLevel.getBlockEntity(MultiBlock.getCorePos(pState, pPos));
             if (blockEntity instanceof SequencerBlockEntity sbe) {
-                if (pPlayer.getItemInHand(pHand).is(ItemInit.SEQUENCER_COMPUTER.get())) {
+                if (pStack.is(ItemInit.SEQUENCER_COMPUTER.get())) {
                     sbe.setHasComputer(true);
-                    pPlayer.getItemInHand(pHand).shrink(1);
+                    pStack.shrink(1);
                     return InteractionResult.CONSUME;
                 }
-                if (pPlayer.getItemInHand(pHand).is(ItemInit.SEQUENCER_DOOR.get())) {
+                if (pStack.is(ItemInit.SEQUENCER_DOOR.get())) {
                     sbe.setHasDoor(true);
-                    pPlayer.getItemInHand(pHand).shrink(1);
+                    pStack.shrink(1);
                     return InteractionResult.CONSUME;
                 }
-                if (pPlayer.getItemInHand(pHand).is(ItemInit.SEQUENCER_SCREEN.get())) {
+                if (pStack.is(ItemInit.SEQUENCER_SCREEN.get())) {
                     if (!sbe.isHasComputer()) return InteractionResult.FAIL;
                     sbe.setHasScreen(true);
-                    pPlayer.getItemInHand(pHand).shrink(1);
+                    pStack.shrink(1);
                     return InteractionResult.CONSUME;
 
                 }
@@ -89,9 +88,9 @@ public class SequencerBlock extends MultiEntityBlock {
                     return InteractionResult.CONSUME;
                 }
             }
-            return super.use(pState, pLevel, pPos, pPlayer, pHand, pHit);
+            return super.useItemOn(pStack, pState, pLevel, pPos, pPlayer, pHand, pHit);
         }
-        return InteractionResult.sidedSuccess(pLevel.isClientSide);
+        return InteractionResult.SUCCESS;
     }
 
     @Override

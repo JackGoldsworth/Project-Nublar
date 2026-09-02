@@ -4,7 +4,7 @@ import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.api.DNAData;
 import net.dumbcode.projectnublar.client.screen.SequencerScreen;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
@@ -39,18 +39,18 @@ public class EntityWidget extends AbstractButton {
     }
 
     @Override
-    protected void renderWidget(GuiGraphics guiGraphics, int x, int y, float partialTicks) {
+    protected void extractContents(GuiGraphicsExtractor guiGraphics, int x, int y, float partialTicks) {
         SequencerScreen.drawBorder(guiGraphics, getX(), getY(), getWidth(), getHeight(), Constants.BORDER_COLOR, 1);
         if (selected) {
             guiGraphics.fill(getX() + 1, getY() + 1, getX() + getWidth() - 1, getY() + getHeight() - 1, 0xFF063B6B);
         } else {
             guiGraphics.fill(getX() + 1, getY() + 1, getX() + getWidth() - 1, getY() + getHeight() - 1, 0xFF193B59);
         }
-        guiGraphics.drawCenteredString(Minecraft.getInstance().font, getMessage(), getX() + getWidth() / 2, getY() + height / 2 - Minecraft.getInstance().font.lineHeight / 2 , 0xFFFFFFFF);
+        guiGraphics.centeredText(Minecraft.getInstance().font, getMessage(), getX() + getWidth() / 2, getY() + height / 2 - Minecraft.getInstance().font.lineHeight / 2 , 0xFFFFFFFF);
     }
 
     @Override
-    public void onPress() {
+    public void onPress(net.minecraft.client.input.InputWithModifiers input) {
         this.selected = !selected;
         onClick.onClick(this, selected);
     }

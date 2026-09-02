@@ -21,3 +21,12 @@ build
 # other
 eclipse
 run
+
+CLAUDE.md
+learnings
+clientRun
+serverRun
+dataRun
+# other additions
+.neoforge
+common/src/generated/

@@ -2,7 +2,7 @@ package net.dumbcode.projectnublar.entity.ai.behaviour.actions;
 
 import net.minecraft.world.entity.LivingEntity;
 import net.tslat.smartbrainlib.api.core.behaviour.custom.misc.Idle;
-import software.bernie.geckolib.animatable.GeoEntity;
+import com.geckolib.animatable.GeoEntity;
 
 public class  IdleAnimationBehaviour<E extends LivingEntity & GeoEntity> extends Idle<E> {
 

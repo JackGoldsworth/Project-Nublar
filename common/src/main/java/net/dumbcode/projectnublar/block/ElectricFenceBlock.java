@@ -21,8 +21,8 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.dumbcode.projectnublar.annotation.OnlyIn.Dist;
+import net.dumbcode.projectnublar.annotation.OnlyIn;
 import org.joml.Vector3f;
 
 public class ElectricFenceBlock extends BlockConnectableBase implements EntityBlock {
@@ -35,7 +35,9 @@ public class ElectricFenceBlock extends BlockConnectableBase implements EntityBl
 
     @Override
     public RenderShape getRenderShape(BlockState pState) {
-        return RenderShape.ENTITYBLOCK_ANIMATED;
+        // 26.2: ENTITYBLOCK_ANIMATED is gone; the fence geometry is drawn by the block
+        // entity renderer (ElectricWireRenderer), so the baked block model is skipped
+        return RenderShape.INVISIBLE;
     }
 
     @Override
@@ -85,9 +87,9 @@ public class ElectricFenceBlock extends BlockConnectableBase implements EntityBl
     }
 
     @Override
-    public void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
-        super.neighborChanged(state, level, pos, neighborBlock, neighborPos, movedByPiston);
-        BlockState state1 = level.getBlockState(neighborPos);
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, @org.jetbrains.annotations.Nullable net.minecraft.world.level.redstone.Orientation orientation, boolean movedByPiston) {
+        super.neighborChanged(state, level, pos, neighborBlock, orientation, movedByPiston);
+        BlockState state1 = level.getBlockState(pos);
     }
 
     @org.jetbrains.annotations.Nullable

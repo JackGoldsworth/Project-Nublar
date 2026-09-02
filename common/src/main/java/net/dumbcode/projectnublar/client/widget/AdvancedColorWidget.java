@@ -9,7 +9,7 @@ import net.dumbcode.projectnublar.api.Genes;
 import net.dumbcode.projectnublar.client.CommonClientClass;
 import net.dumbcode.projectnublar.client.renderer.layer.DinoLayer;
 import net.dumbcode.projectnublar.client.screen.SequencerScreen;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.network.chat.Component;
 
@@ -56,12 +56,12 @@ public class AdvancedColorWidget extends ParentWidget<SequencerScreen> implement
 
 
     @Override
-    protected void renderBackground(GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
+    protected void renderBackground(GuiGraphicsExtractor pGuiGraphicsExtractor, int pMouseX, int pMouseY, float pPartialTick) {
 
     }
 
     @Override
-    protected void renderForeground(GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
+    protected void renderForeground(GuiGraphicsExtractor pGuiGraphicsExtractor, int pMouseX, int pMouseY, float pPartialTick) {
 
     }
 

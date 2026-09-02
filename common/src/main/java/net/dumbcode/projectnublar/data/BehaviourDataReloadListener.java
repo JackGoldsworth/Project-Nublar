@@ -4,36 +4,52 @@ import com.google.gson.*;
 import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.api.DinoBehaviourData;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.FileToIdConverter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
+import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.EntityType;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.BufferedReader;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-public class BehaviourDataReloadListener extends SimpleJsonResourceReloadListener {
+public class BehaviourDataReloadListener extends SimplePreparableReloadListener<Map<Identifier, JsonElement>> {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     private static final String LOCATION = "config/dinosaurs";
+    private static final FileToIdConverter CONVERTER = FileToIdConverter.json(LOCATION);
 
     private static Map<EntityType<?>, DinoBehaviourData> behaviourDataMap = Collections.emptyMap();
 
     public BehaviourDataReloadListener(){
-        super(GSON, LOCATION);
         Constants.LOG.info("Dino behaviour manager initialized, scanning folder: data/'{}'", LOCATION);
 
     }
 
     @Override
-    protected void apply(Map<ResourceLocation, JsonElement> resourceLocationJsonElementMap, ResourceManager resourceManager, ProfilerFiller profilerFiller) {
+    protected Map<Identifier, JsonElement> prepare(ResourceManager resourceManager, ProfilerFiller profilerFiller) {
+        Map<Identifier, JsonElement> map = new HashMap<>();
+        for (Map.Entry<Identifier, Resource> entry : CONVERTER.listMatchingResources(resourceManager).entrySet()) {
+            try (BufferedReader reader = entry.getValue().openAsReader()) {
+                map.put(CONVERTER.fileToId(entry.getKey()), JsonParser.parseReader(reader));
+            } catch (Exception e) {
+                Constants.LOG.error("Failed to parse behaviour file: {} - Error: {}", entry.getKey(), e.getMessage());
+            }
+        }
+        return map;
+    }
+
+    @Override
+    protected void apply(Map<Identifier, JsonElement> resourceLocationJsonElementMap, ResourceManager resourceManager, ProfilerFiller profilerFiller) {
         Map<EntityType<?>, DinoBehaviourData> newMap = new HashMap<>();
 
-        for(Map.Entry<ResourceLocation, JsonElement> entry: resourceLocationJsonElementMap.entrySet()){
-            ResourceLocation fileID = entry.getKey();
+        for(Map.Entry<Identifier, JsonElement> entry: resourceLocationJsonElementMap.entrySet()){
+            Identifier fileID = entry.getKey();
             JsonElement element = entry.getValue();
 
             try {
@@ -44,7 +60,7 @@ public class BehaviourDataReloadListener extends SimpleJsonResourceReloadListene
                 JsonObject jsonObject = element.getAsJsonObject();
 
                 String entityIdstring = GsonHelper.getAsString(jsonObject, "species_id");
-                ResourceLocation entityRl = ResourceLocation.tryParse(entityIdstring);
+                Identifier entityRl = Identifier.tryParse(entityIdstring);
 
                 EntityType<?> entityType = BuiltInRegistries.ENTITY_TYPE.getOptional(entityRl)
                         .orElseThrow(() -> new JsonSyntaxException("Unknown entity_id" + entityRl + "in DNA extraction file: " + fileID));

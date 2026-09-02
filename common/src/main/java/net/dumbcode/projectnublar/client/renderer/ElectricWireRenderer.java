@@ -1,100 +1,80 @@
 package net.dumbcode.projectnublar.client.renderer;
 
+import com.geckolib.constant.dataticket.DataTicket;
+import com.google.common.reflect.TypeToken;
+import com.geckolib.renderer.base.GeoRenderState;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.dumbcode.projectnublar.block.api.Connection;
 import net.dumbcode.projectnublar.block.api.RenderUtils;
 import net.dumbcode.projectnublar.block.entity.BlockEntityElectricFence;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.dumbcode.projectnublar.client.renderer.state.NublarBlockEntityRenderState;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Matrix4f;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-public class ElectricWireRenderer implements BlockEntityRenderer<BlockEntityElectricFence> {
+// 26.2: BERs are extract-then-submit; the animatable is only available during state extraction,
+// so the connection geometry data is captured into the render state and submitted from there.
+public class ElectricWireRenderer implements BlockEntityRenderer<BlockEntityElectricFence, NublarBlockEntityRenderState> {
+    private static final DataTicket<List<Connection.RenderData>> CONNECTION_DATA =
+            DataTicket.create("electric_wire_connection_data", new TypeToken<>() {});
 
     @Override
-    public void render(BlockEntityElectricFence pBlockEntity, float pPartialTick, PoseStack pPoseStack, MultiBufferSource pBuffer, int pPackedLight, int pPackedOverlay) {
-        List<Connection> connections = pBlockEntity.getConnections().stream().toList();
-        VertexConsumer consumer = pBuffer.getBuffer(RenderType.leash());
-        connections.forEach(connection -> {
-//            if (connection.isPowered(pBlockEntity.getLevel())) {
-                RenderUtils.drawSpacedCube(pPoseStack,consumer, 1,1,1,1,0x00F000F0, OverlayTexture.NO_OVERLAY,
-                        connection.getRenderData().data()[0],
-                        connection.getRenderData().data()[1], connection.getRenderData().data()[2],
-                        connection.getRenderData().data()[3], connection.getRenderData().data()[4],
-                        connection.getRenderData().data()[5], connection.getRenderData().data()[6],
-                        connection.getRenderData().data()[7], connection.getRenderData().data()[8],
-                        connection.getRenderData().data()[9], connection.getRenderData().data()[10],
-                        connection.getRenderData().data()[11], connection.getRenderData().data()[12],
-                        connection.getRenderData().data()[13], connection.getRenderData().data()[14],
-                        connection.getRenderData().data()[15], connection.getRenderData().data()[16],
-                        connection.getRenderData().data()[17], connection.getRenderData().data()[18],
-                        connection.getRenderData().data()[19], connection.getRenderData().data()[20],
-                        connection.getRenderData().data()[21], connection.getRenderData().data()[22],
-                        connection.getRenderData().data()[23], connection.getRenderData().data()[24],
-                        connection.getRenderData().data()[25], connection.getRenderData().data()[26],
-                        connection.getRenderData().data()[27], connection.getRenderData().data()[28],
-                        connection.getRenderData().data()[29], connection.getRenderData().data()[30],
-                        connection.getRenderData().data()[31], connection.getRenderData().data()[32],
-                        connection.getRenderData().data()[33], connection.getRenderData().data()[34],
-                        connection.getRenderData().data()[35], connection.getRenderData().data()[36],
-                        connection.getRenderData().data()[37], connection.getRenderData().data()[38]
-                );
-//            }
+    public NublarBlockEntityRenderState createRenderState() {
+        return new NublarBlockEntityRenderState();
+    }
+
+    @Override
+    public void extractRenderState(BlockEntityElectricFence blockEntity, NublarBlockEntityRenderState renderState, float partialTick, Vec3 cameraPos, @Nullable ModelFeatureRenderer.CrumblingOverlay damageOverlayState) {
+        BlockEntityRenderer.super.extractRenderState(blockEntity, renderState, partialTick, cameraPos, damageOverlayState);
+        renderState.addGeckolibData(CONNECTION_DATA,
+                blockEntity.getConnections().stream().map(Connection::getRenderData).toList());
+    }
+
+    @Override
+    public void submit(NublarBlockEntityRenderState renderState, PoseStack poseStack, SubmitNodeCollector renderTasks, CameraRenderState cameraRenderState) {
+        List<Connection.RenderData> connections = renderState.getGeckolibData(CONNECTION_DATA);
+        if (connections == null) {
+            return;
+        }
+        renderTasks.submitCustomGeometry(poseStack, RenderTypes.leash(), (pose, consumer) -> {
+            poseStack.pushPose();
+            poseStack.last().set(pose);
+            for (Connection.RenderData connection : connections) {
+                drawConnection(poseStack, consumer, connection);
+            }
+            poseStack.popPose();
         });
     }
 
-    private void renderLeash(Vec3 in, Vec3 out, float pPartialTicks, PoseStack pPoseStack, MultiBufferSource pBuffer) {
-        pPoseStack.pushPose();
-        double d0 = 0;//(double)(Mth.lerp(pPartialTicks, pEntityLiving.yBodyRotO, pEntityLiving.yBodyRot) * ((float)Math.PI / 180F)) + (Math.PI / 2D);
-        double d1 = Math.cos(d0) * out.z + Math.sin(d0) * out.x;
-        double d2 = Math.sin(d0) * out.z - Math.cos(d0) * out.x;
-        double d3 = Mth.lerp((double) pPartialTicks, in.x(), in.x()) + d1;
-        double d4 = Mth.lerp((double) pPartialTicks, in.y(), in.y()) + out.y;
-        double d5 = Mth.lerp((double) pPartialTicks, in.z(), in.z()) + d2;
-        pPoseStack.translate(d1, out.y, d2);
-        float f = (float) (in.x - d3);
-        float f1 = (float) (in.y - d4);
-        float f2 = (float) (in.z - d5);
-        float f3 = 0.025F;
-        VertexConsumer vertexconsumer = pBuffer.getBuffer(RenderType.leash());
-        Matrix4f matrix4f = pPoseStack.last().pose();
-        float f4 = Mth.invSqrt(f * f + f2 * f2) * 0.025F / 2.0F;
-        float f5 = f2 * f4;
-        float f6 = f * f4;
-//        BlockPos blockpos = BlockPos.containing(pEntityLiving.getEyePosition(pPartialTicks));
-//        BlockPos blockpos1 = BlockPos.containing(pLeashHolder.getEyePosition(pPartialTicks));
-        int i = 15;
-        int j = 15;
-        int k = 15;//pEntityLiving.getLevel().getBrightness(LightLayer.SKY, blockpos);
-        int l = 15;//pEntityLiving.getLevel().getBrightness(LightLayer.SKY, blockpos1);
-
-        addVertexPair(vertexconsumer, matrix4f, f, f1, f2, i, j, k, l, 0.025F, 0.025F, f5, f6, 1, false);
-//        vertexconsumer.vertex(matrix4f, 0, 0, 0).color(1, 1, 1, 1.0F).uv2(k).endVertex();
-//        vertexconsumer.vertex(matrix4f, 0, 0, 1).color(1, 1, 1, 1.0F).uv2(k).endVertex();
-
-        addVertexPair(vertexconsumer, matrix4f, f, f1, f2, i, j, k, l, 0.025F, 0.0F, f5, f6, 24, true);
-//        vertexconsumer.vertex(matrix4f, 0, 1, 1).color(1, 1, 1, 1.0F).uv2(k).endVertex();
-//        vertexconsumer.vertex(matrix4f, 1, 1, 0).color(1, 1, 1, 1.0F).uv2(k).endVertex();
-
-        pPoseStack.popPose();
-    }
-
-    private static void addVertexPair(VertexConsumer pConsumer, Matrix4f pMatrix, float p_174310_, float p_174311_, float p_174312_, int pEntityBlockLightLevel, int pLeashHolderBlockLightLevel, int pEntitySkyLightLevel, int pLeashHolderSkyLightLevel, float p_174317_, float p_174318_, float p_174319_, float p_174320_, int pIndex, boolean p_174322_) {
-        float f = (float) pIndex/24f;
-        int i = (int) Mth.lerp(f, (float) pEntityBlockLightLevel, (float) pLeashHolderBlockLightLevel);
-        int j = (int) Mth.lerp(f, (float) pEntitySkyLightLevel, (float) pLeashHolderSkyLightLevel);
-        int k = LightTexture.pack(i, j);
-        float f5 = p_174310_ * f;
-        float f6 = p_174311_ > 0.0F ? p_174311_ * f * f : p_174311_ - p_174311_ * (1.0F - f) * (1.0F - f);
-        float f7 = p_174312_ * f;
-        pConsumer.vertex(pMatrix, f5 - p_174319_, f6 + p_174318_, f7 + p_174320_).color(1, 1, 1, 1.0F).uv2(k).endVertex();
-        pConsumer.vertex(pMatrix, f5 + p_174319_, f6 + p_174317_ - p_174318_, f7 - p_174320_).color(1, 1, 1, 1.0F).uv2(k).endVertex();
+    private static void drawConnection(PoseStack poseStack, com.mojang.blaze3d.vertex.VertexConsumer consumer, Connection.RenderData renderData) {
+        RenderUtils.drawSpacedCube(poseStack, consumer, 1, 1, 1, 1, 0x00F000F0, OverlayTexture.NO_OVERLAY,
+                renderData.data()[0],
+                renderData.data()[1], renderData.data()[2],
+                renderData.data()[3], renderData.data()[4],
+                renderData.data()[5], renderData.data()[6],
+                renderData.data()[7], renderData.data()[8],
+                renderData.data()[9], renderData.data()[10],
+                renderData.data()[11], renderData.data()[12],
+                renderData.data()[13], renderData.data()[14],
+                renderData.data()[15], renderData.data()[16],
+                renderData.data()[17], renderData.data()[18],
+                renderData.data()[19], renderData.data()[20],
+                renderData.data()[21], renderData.data()[22],
+                renderData.data()[23], renderData.data()[24],
+                renderData.data()[25], renderData.data()[26],
+                renderData.data()[27], renderData.data()[28],
+                renderData.data()[29], renderData.data()[30],
+                renderData.data()[31], renderData.data()[32],
+                renderData.data()[33], renderData.data()[34],
+                renderData.data()[35], renderData.data()[36],
+                renderData.data()[37], renderData.data()[38]
+        );
     }
 }

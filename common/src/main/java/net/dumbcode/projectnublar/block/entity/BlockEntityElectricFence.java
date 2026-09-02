@@ -7,23 +7,16 @@ import net.dumbcode.projectnublar.block.api.SyncingBlockEntity;
 import net.dumbcode.projectnublar.init.BlockInit;
 import net.dumbcode.projectnublar.util.LineUtils;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import org.jetbrains.annotations.Nullable;
-import software.bernie.geckolib.model.data.EntityModelData;
+import net.dumbcode.projectnublar.annotation.OnlyIn.Dist;
+import net.dumbcode.projectnublar.annotation.OnlyIn;
 
-
-import java.lang.constant.Constable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -45,27 +38,24 @@ public class BlockEntityElectricFence extends BlockEntityElectricFenceBase imple
     }
 
     @Override
-    public void saveData(CompoundTag compound) {
-        super.saveData(compound);
-        ListTag nbt = new ListTag();
-        int i = 0;
+    protected void saveData(ValueOutput output) {
+        super.saveData(output);
+        ValueOutput.ValueOutputList nbt = output.childrenList("connections");
         for (Connection connection : this.fenceConnections) {
-            nbt.add(connection.writeToNBT(new CompoundTag()));
+            connection.writeData(nbt.addChild());
         }
-        compound.put("connections", nbt);
     }
 
     @Override
-    public void loadData(CompoundTag compound) {
-        super.loadData(compound);
+    protected void loadData(ValueInput input) {
+        super.loadData(input);
         this.fenceConnections.clear();
-        ListTag nbt = compound.getList("connections", compound.TAG_COMPOUND);
-        for (int i = 0; i < nbt.size(); i++) {
-            Connection connection = Connection.fromNBT(nbt.getCompound(i), this);
+        input.childrenListOrEmpty("connections").forEach(tag -> {
+            Connection connection = Connection.fromData(tag, this);
             if(connection.isValid()) {
                 this.fenceConnections.add(connection);
             }
-        }
+        });
 
         if(this.level != null) {
             this.triggerModelUpdate();
@@ -104,6 +94,21 @@ public class BlockEntityElectricFence extends BlockEntityElectricFenceBase imple
     @Override
     public Set<Connection> getConnections() {
         return Collections.unmodifiableSet(this.fenceConnections);
+    }
+
+    // Formerly BlockEntityElectricFenceMixin (1.20.1 forge) — NeoForge model data in 26.2.
+    // The getModelData()/ModelProperty side was dropped for the fabric port (nothing
+    // consumed it: 26.2 renders fences through the BER, not baked models).
+    public void requestModelDataUpdate() {
+        if(this.level != null) {
+          this.level.sendBlockUpdated(this.getBlockPos(), this.getBlockState(), this.getBlockState(), 3);
+        }
+        this.resetCollidableCache();
+    }
+
+    @Override
+    public void triggerModelUpdate() {
+        this.requestModelDataUpdate();
     }
 
     /**

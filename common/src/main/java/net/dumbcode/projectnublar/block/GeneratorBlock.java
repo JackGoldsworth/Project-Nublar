@@ -1,10 +1,8 @@
 package net.dumbcode.projectnublar.block;
 
-import net.dumbcode.projectnublar.block.api.MultiBlock;
-import net.dumbcode.projectnublar.block.entity.BlockEntityElectricFencePole;
+import net.dumbcode.projectnublar.init.BlockInit;
 import net.dumbcode.projectnublar.block.entity.GeneratorBlockEntity;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Player;
@@ -30,8 +28,17 @@ public class GeneratorBlock extends BaseEntityBlock {
         this.energyInput = energyInput;
         this.energyOutput = energyOutput;
     }
-    public InteractionResult use(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
-        if (pLevel.isClientSide) {
+
+    // 26.2: generator blocks have no Properties-only ctor; the codec is only used for
+    // block-state serialization, which never re-creates these blocks
+    @Override
+    public com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return com.mojang.serialization.MapCodec.unit(this);
+    }
+
+    @Override
+    protected InteractionResult useWithoutItem(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, BlockHitResult pHit) {
+        if (pLevel.isClientSide()) {
             return InteractionResult.SUCCESS;
         } else {
             this.openContainer(pLevel, pPos, pPlayer);
@@ -60,7 +67,7 @@ public class GeneratorBlock extends BaseEntityBlock {
     @javax.annotation.Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level pLevel, BlockState pState, BlockEntityType<T> pBlockEntityType) {
-        return createTickerHelper(pBlockEntityType, pBlockEntityType, (level, pos, state, be) -> ((GeneratorBlockEntity)be).tick(level, pos, state, (GeneratorBlockEntity)be));
+        return createTickerHelper(pBlockEntityType, BlockInit.GENERATOR.get(), (level, pos, state, be) -> ((GeneratorBlockEntity)be).tick(level, pos, state, (GeneratorBlockEntity)be));
     }
 
     public int getMaxEnergy() {

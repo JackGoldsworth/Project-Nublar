@@ -5,26 +5,27 @@ import net.dumbcode.projectnublar.init.BlockInit;
 import net.dumbcode.projectnublar.util.DinoNeedsUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.pathfinder.BlockPathTypes;
+import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.level.pathfinder.PathfindingContext;
 import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
 
 public class FenceAwareNodeEvaluator extends WalkNodeEvaluator {
     @Override
-    public BlockPathTypes getBlockPathType(BlockGetter level, int x, int y, int z, Mob mob) {
-        BlockPathTypes original = super.getBlockPathType(level, x, y, z);
+    public PathType getPathType(PathfindingContext context, int x, int y, int z) {
+        PathType original = super.getPathType(context, x, y, z);
         BlockPos pos = new BlockPos(x,y,z);
-        BlockState ground = level.getBlockState(pos);
-        BlockState above = level.getBlockState(pos.above());
-        BlockState above2 = level.getBlockState(pos.above(2));
+        BlockState ground = context.getBlockState(pos);
+        BlockState above = context.getBlockState(pos.above());
+        BlockState above2 = context.getBlockState(pos.above(2));
 
         if(isFenceOrWire(ground) || isFenceOrWire(above) || isFenceOrWire(above2)){
+            Mob mob = this.mob;
             if(mob instanceof Dinosaur dinosaur && DinoNeedsUtils.allNeedsAtZero(dinosaur)) {
-                    return BlockPathTypes.OPEN;
+                    return PathType.OPEN;
             }
 
-            return BlockPathTypes.FENCE;
+            return PathType.FENCE;
         }
 
         return original;

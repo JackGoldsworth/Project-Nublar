@@ -45,46 +45,46 @@ public record DinoBehaviourData(
 {
 
     public static DinoBehaviourData fromNBT(CompoundTag tag) {
-        String pSpeciesID = tag.getString("species_id");
-        String pDietID = tag.getString("diet_id");
+        String pSpeciesID = tag.getStringOr("species_id", "");
+        String pDietID = tag.getStringOr("diet_id", "");
 
 
-        double pMaxHealth = tag.getDouble("default_health");
-        double pEnergyCapacity= tag.getDouble("default_energy_capacity");
-        double pAttack = tag.getDouble("default_attack_damage");
-        double pSpeed= tag.getDouble("default_speed");
-        double pSize= tag.getDouble("default_size");
-        double pIntelligence= tag.getDouble("default_intelligence");
-        double pImmunity= tag.getDouble("default_immunity");
-        double pResistance= tag.getDouble("default_resistance");
-        double pHealthRegen= tag.getDouble("default_health_regen");
-        double pGrowthRate= tag.getDouble("default_growth_rate");
-        double pFertility= tag.getDouble("default_fertility");
-        double pGestationTime= tag.getDouble("default_gestation_time");
-        double pClutchSize= tag.getDouble("default_egg_clutch");
-        double pVisionQuality= tag.getDouble("default_vision");
+        double pMaxHealth = tag.getDoubleOr("default_health", 0.0D);
+        double pEnergyCapacity= tag.getDoubleOr("default_energy_capacity", 0.0D);
+        double pAttack = tag.getDoubleOr("default_attack_damage", 0.0D);
+        double pSpeed= tag.getDoubleOr("default_speed", 0.0D);
+        double pSize= tag.getDoubleOr("default_size", 0.0D);
+        double pIntelligence= tag.getDoubleOr("default_intelligence", 0.0D);
+        double pImmunity= tag.getDoubleOr("default_immunity", 0.0D);
+        double pResistance= tag.getDoubleOr("default_resistance", 0.0D);
+        double pHealthRegen= tag.getDoubleOr("default_health_regen", 0.0D);
+        double pGrowthRate= tag.getDoubleOr("default_growth_rate", 0.0D);
+        double pFertility= tag.getDoubleOr("default_fertility", 0.0D);
+        double pGestationTime= tag.getDoubleOr("default_gestation_time", 0.0D);
+        double pClutchSize= tag.getDoubleOr("default_egg_clutch", 0.0D);
+        double pVisionQuality= tag.getDoubleOr("default_vision", 0.0D);
 
-        double pDomesticity= tag.getDouble("default_domesticity");
-        double pAggressionScore= tag.getDouble("default_aggression");
-        double pTamingScore= tag.getDouble("default_tame_score");
-        double pTrustIncrease = tag.getDouble("default_trust_increase");
-        double pSocial= tag.getDouble("default_social");
-        double pSocialDrain= tag.getDouble("default_social_drain");
-        int pGroupSize= tag.getInt("default_group_size");
+        double pDomesticity= tag.getDoubleOr("default_domesticity", 0.0D);
+        double pAggressionScore= tag.getDoubleOr("default_aggression", 0.0D);
+        double pTamingScore= tag.getDoubleOr("default_tame_score", 0.0D);
+        double pTrustIncrease = tag.getDoubleOr("default_trust_increase", 0.0D);
+        double pSocial= tag.getDoubleOr("default_social", 0.0D);
+        double pSocialDrain= tag.getDoubleOr("default_social_drain", 0.0D);
+        int pGroupSize= tag.getIntOr("default_group_size", 0);
 
 
-        double pEatRate= tag.getDouble("default_eat_rate");
-        double pDehydrationRate = tag.getDouble("default_dehydration_rate");
-        int pStarvationLimit = tag.getInt("default_starvation_limit");
-        int pDehydrationLimit = tag.getInt("default_dehydration_limit");
-        double pBaseExhaustionRate = tag.getDouble("default_exhaustion_rate");
+        double pEatRate= tag.getDoubleOr("default_eat_rate", 0.0D);
+        double pDehydrationRate = tag.getDoubleOr("default_dehydration_rate", 0.0D);
+        int pStarvationLimit = tag.getIntOr("default_starvation_limit", 0);
+        int pDehydrationLimit = tag.getIntOr("default_dehydration_limit", 0);
+        double pBaseExhaustionRate = tag.getDoubleOr("default_exhaustion_rate", 0.0D);
 
-        double pLowRisk = tag.getDouble("low_risk_threshold");
-        double pMediumRisk = tag.getDouble("medium_risk_threshold");
-        double pHighRisk = tag.getDouble("high_risk_threshold");
+        double pLowRisk = tag.getDoubleOr("low_risk_threshold", 0.0D);
+        double pMediumRisk = tag.getDoubleOr("medium_risk_threshold", 0.0D);
+        double pHighRisk = tag.getDoubleOr("high_risk_threshold", 0.0D);
 
-        boolean pPack = tag.getBoolean("can_form_group");
-        boolean pNocturnal = tag.getBoolean("nocturnal");
+        boolean pPack = tag.getBooleanOr("can_form_group", false);
+        boolean pNocturnal = tag.getBooleanOr("nocturnal", false);
 
         return new DinoBehaviourData(pSpeciesID,pDietID,pMaxHealth,pEnergyCapacity,pAttack,pSpeed,pSize,
                 pIntelligence,pImmunity,pResistance,pHealthRegen,pGrowthRate,pFertility,pGestationTime,pClutchSize,pVisionQuality,pDomesticity,

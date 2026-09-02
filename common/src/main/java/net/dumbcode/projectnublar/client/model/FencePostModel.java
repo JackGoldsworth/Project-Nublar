@@ -1,31 +1,29 @@
 package net.dumbcode.projectnublar.client.model;
 
+import com.geckolib.constant.dataticket.DataTicket;
+import com.geckolib.model.GeoModel;
+import com.geckolib.renderer.base.GeoRenderState;
 import net.dumbcode.projectnublar.block.entity.BlockEntityElectricFencePole;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
-import software.bernie.geckolib.model.GeoModel;
+import net.minecraft.resources.Identifier;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-
+// GeckoLib 5: model hooks receive the render state, not the animatable, so the per-post model and
+// texture paths are captured into the render state by ElectricFenceRenderer and read here.
 public class FencePostModel extends GeoModel<BlockEntityElectricFencePole> {
-    private static final Map<ResourceLocation, ResourceLocation> modelCache = new HashMap<>();
-    private static final Map<ResourceLocation, ResourceLocation> textureCache = new HashMap<>();
-    private static final Map<ResourceLocation, ResourceLocation> animationCache = new HashMap<>();
+    public static final DataTicket<Identifier> MODEL_ID = DataTicket.create("fence_post_model_id", Identifier.class);
+    public static final DataTicket<Identifier> TEXTURE_ID = DataTicket.create("fence_post_texture_id", Identifier.class);
+
     @Override
-    public ResourceLocation getModelResource(BlockEntityElectricFencePole animatable) {
-        return modelCache.computeIfAbsent(BuiltInRegistries.BLOCK.getKey(animatable.getBlockState().getBlock()), k -> new ResourceLocation(k.getNamespace(), "geo/block/" + k.getPath() + ".geo.json"));
+    public Identifier getModelResource(GeoRenderState renderState) {
+        return renderState.getGeckolibData(MODEL_ID);
     }
 
     @Override
-    public ResourceLocation getTextureResource(BlockEntityElectricFencePole animatable) {
-        return textureCache.computeIfAbsent(BuiltInRegistries.BLOCK.getKey(animatable.getBlockState().getBlock()), k -> new ResourceLocation(k.getNamespace(), "textures/block/" + k.getPath() + ".png"));
+    public Identifier getTextureResource(GeoRenderState renderState) {
+        return renderState.getGeckolibData(TEXTURE_ID);
     }
 
     @Override
-    public ResourceLocation getAnimationResource(BlockEntityElectricFencePole animatable) {
+    public Identifier getAnimationResource(BlockEntityElectricFencePole animatable) {
         return null;
     }
 }

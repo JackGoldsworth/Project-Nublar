@@ -4,17 +4,18 @@ import com.mojang.blaze3d.platform.NativeImage;
 
 import net.dumbcode.projectnublar.Constants;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.awt.*;
 public class ColorWheelWidget extends AbstractWidget {
-    public static final ResourceLocation COLOR_WHEEL = new ResourceLocation(Constants.MODID, "color_wheel");
-    public static final ResourceLocation COLOR_WHEEL_BLIP = new ResourceLocation(Constants.MODID, "textures/gui/color_wheel_blip.png");
+    public static final Identifier COLOR_WHEEL = Identifier.fromNamespaceAndPath(Constants.MODID, "color_wheel");
+    public static final Identifier COLOR_WHEEL_BLIP = Identifier.fromNamespaceAndPath(Constants.MODID, "textures/gui/color_wheel_blip.png");
     private int centerX;
     private int centerY;
     private int colorWheelBlipLocationX;
@@ -46,9 +47,9 @@ public class ColorWheelWidget extends AbstractWidget {
     }
 
     @Override
-    protected void renderWidget(GuiGraphics guiGraphics, int i, int i1, float v) {
-        guiGraphics.blit(COLOR_WHEEL, this.getX(), this.getY(), 0, 0, this.height, this.height, this.height, this.height);
-        guiGraphics.blit(COLOR_WHEEL_BLIP, this.colorWheelBlipLocationX - 1, this.colorWheelBlipLocationY - 1, 0, 0, 3, 3, 3, 3);
+    protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int i, int i1, float v) {
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, COLOR_WHEEL, this.getX(), this.getY(), 0, 0, this.height, this.height, this.height, this.height);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, COLOR_WHEEL_BLIP, this.colorWheelBlipLocationX - 1, this.colorWheelBlipLocationY - 1, 0, 0, 3, 3, 3, 3);
     }
 
     @Override
@@ -57,13 +58,13 @@ public class ColorWheelWidget extends AbstractWidget {
     }
 
     @Override
-    protected void onDrag(double pMouseX, double pMouseY, double $$2, double $$3) {
-        checkColorAtPoint(pMouseX, pMouseY);
+    protected void onDrag(net.minecraft.client.input.MouseButtonEvent event, double $$2, double $$3) {
+        checkColorAtPoint(event.x(), event.y());
     }
 
     @Override
-    public void onClick(double mouseX, double mousey) {
-        checkColorAtPoint(mouseX, mousey);
+    public void onClick(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        checkColorAtPoint(event.x(), event.y());
     }
 
 
@@ -121,17 +122,17 @@ public class ColorWheelWidget extends AbstractWidget {
             for (int y = 0; y < diameter; y++) {
                 dist2 = distance2(x, y, radius, radius);
                 if (dist2 > radius2) {
-                    buffer.setPixelRGBA(x, y, 0xFFFFFF);
+                    buffer.setPixelABGR(x, y, 0xFFFFFF);
                     continue;
                 }
                 hue = (float) (Math.atan2(y - radius, x - radius) / PI2);
                 sat = (float) Math.sqrt((float) dist2) / (float) radius;
                 rgb = Color.HSBtoRGB(-hue - (1f / 3f), sat, (float)brightness);
-                buffer.setPixelRGBA(x, y, rgb);
+                buffer.setPixelABGR(x, y, rgb);
 
             }
         }
-        return new DynamicTexture(buffer);
+        return new DynamicTexture(() -> "ColorWheel", buffer);
     }
     static int distance2(int x1, int y1, int x2, int y2) {
         int a = x2 - x1;

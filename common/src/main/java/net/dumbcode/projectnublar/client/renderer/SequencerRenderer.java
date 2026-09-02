@@ -1,54 +1,66 @@
 package net.dumbcode.projectnublar.client.renderer;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.geckolib.cache.model.GeoBone;
+import com.geckolib.constant.dataticket.DataTicket;
+import com.geckolib.model.DefaultedBlockGeoModel;
+import com.geckolib.renderer.GeoBlockRenderer;
+import com.geckolib.renderer.base.BoneSnapshots;
+import com.geckolib.renderer.base.RenderPassInfo;
 import net.dumbcode.projectnublar.Constants;
-import net.dumbcode.projectnublar.block.entity.ProcessorBlockEntity;
 import net.dumbcode.projectnublar.block.entity.SequencerBlockEntity;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.phys.Vec3;
-import software.bernie.geckolib.cache.object.GeoBone;
-import software.bernie.geckolib.model.DefaultedBlockGeoModel;
-import software.bernie.geckolib.renderer.GeoBlockRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.dumbcode.projectnublar.client.renderer.state.NublarBlockEntityRenderState;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.Objects;
+public class SequencerRenderer extends GeoBlockRenderer<SequencerBlockEntity, NublarBlockEntityRenderState> {
+    private static final DataTicket<Boolean> HAS_COMPUTER = DataTicket.create("sequencer_has_computer", Boolean.class);
+    private static final DataTicket<Boolean> HAS_DOOR = DataTicket.create("sequencer_has_door", Boolean.class);
+    private static final DataTicket<Boolean> HAS_SCREEN = DataTicket.create("sequencer_has_screen", Boolean.class);
 
-public class SequencerRenderer extends GeoBlockRenderer<SequencerBlockEntity> {
-    public SequencerRenderer() {
-        super(new DefaultedBlockGeoModel<>(Constants.modLoc( "sequencer")) {
-        });
+    public SequencerRenderer(BlockEntityRendererProvider.Context context) {
+        super(context, new DefaultedBlockGeoModel<>(Constants.modLoc("sequencer")));
+    }
+
+    // GeckoLib 5: the default creates a plain BlockEntityRenderState, which would ClassCastException in addRenderData
+    @Override
+    public NublarBlockEntityRenderState createRenderState() {
+        return new NublarBlockEntityRenderState();
     }
 
     @Override
-    public void renderRecursively(PoseStack poseStack, SequencerBlockEntity animatable, GeoBone bone, RenderType renderType, MultiBufferSource bufferSource, VertexConsumer buffer, boolean isReRender, float partialTick, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
-        if(bone.getName().contains("computer")){
-            bone.setHidden(!animatable.isHasComputer());
+    public void addRenderData(SequencerBlockEntity animatable, @Nullable Void relatedObject, NublarBlockEntityRenderState renderState, float partialTick) {
+        super.addRenderData(animatable, relatedObject, renderState, partialTick);
+        renderState.addGeckolibData(HAS_COMPUTER, animatable.isHasComputer());
+        renderState.addGeckolibData(HAS_DOOR, animatable.isHasDoor());
+        renderState.addGeckolibData(HAS_SCREEN, animatable.isHasScreen());
+    }
+
+    // GeckoLib 5: bone visibility is applied via the BoneSnapshots of the render pass instead of
+    // per-bone renderRecursively overrides (that hook no longer exists).
+    @Override
+    public void adjustModelBonesForRender(RenderPassInfo<NublarBlockEntityRenderState> renderPassInfo, BoneSnapshots snapshots) {
+        super.adjustModelBonesForRender(renderPassInfo, snapshots);
+        for (GeoBone bone : renderPassInfo.model().boneLookup().get().values()) {
+            String boneName = bone.name();
+            if (boneName.contains("computer")) {
+                hideIfAbsent(renderPassInfo, snapshots, bone, HAS_COMPUTER);
+            } else if (boneName.contains("Door")) {
+                hideIfAbsent(renderPassInfo, snapshots, bone, HAS_DOOR);
+            } else if (boneName.contains("monitor")) {
+                hideIfAbsent(renderPassInfo, snapshots, bone, HAS_SCREEN);
+            }
         }
-        if(bone.getName().contains("Door")){
-            bone.setHidden(!animatable.isHasDoor());
+    }
+
+    private static void hideIfAbsent(RenderPassInfo<NublarBlockEntityRenderState> renderPassInfo, BoneSnapshots snapshots,
+                                     GeoBone bone, DataTicket<Boolean> ticket) {
+        if (!Boolean.TRUE.equals(renderPassInfo.getGeckolibData(ticket))) {
+            snapshots.get(bone).skipRender(true).skipChildrenRender(true);
         }
-        if(bone.getName().contains("monitor")){
-            bone.setHidden(!animatable.isHasScreen());
-        }
-        super.renderRecursively(poseStack, animatable, bone, renderType, bufferSource, buffer, isReRender, partialTick, packedLight, packedOverlay, red, green, blue, alpha);
     }
 
     @Override
-    public boolean shouldRenderOffScreen(SequencerBlockEntity pBlockEntity) {
-
+    public boolean shouldRenderOffScreen() {
         return true;
     }
-
-    @Override
-    public int getViewDistance() {
-        return super.getViewDistance();
-    }
-
-    @Override
-    public boolean shouldRender(SequencerBlockEntity pBlockEntity, Vec3 pCameraPos) {
-        return Vec3.atCenterOf(pBlockEntity.getBlockPos()).multiply(1.0D, 0.0D, 1.0D).closerThan(pCameraPos.multiply(1.0D, 0.0D, 1.0D), this.getViewDistance());
-    }
-
 }

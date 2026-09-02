@@ -1,5 +1,7 @@
 package net.dumbcode.projectnublar.menutypes;
 
+import net.dumbcode.projectnublar.api.DNAData;
+import net.dumbcode.projectnublar.init.DataComponentInit;
 import net.dumbcode.projectnublar.init.MenuTypeInit;
 import net.dumbcode.projectnublar.init.TagInit;
 import net.minecraft.world.Container;
@@ -29,7 +31,8 @@ public class EggPrinterMenu extends AbstractContainerMenu {
         this.addSlot(new Slot(container, 0, 15, 110){
             @Override
             public boolean mayPlace(ItemStack pStack) {
-                return pStack.hasTag() && pStack.getTag().contains("Embryo");
+                DNAData dnaData = pStack.get(DataComponentInit.DNA_DATA.get());
+                return dnaData != null && dnaData.isEmbryo();
             }
         });
         this.addSlot(new Slot(container, 1, 15, 80){

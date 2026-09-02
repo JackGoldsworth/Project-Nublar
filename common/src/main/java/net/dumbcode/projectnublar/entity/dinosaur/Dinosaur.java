@@ -22,6 +22,7 @@ import net.dumbcode.projectnublar.init.*;
 import net.dumbcode.projectnublar.util.DinoAnimationUtils;
 import net.dumbcode.projectnublar.util.DinoNeedsUtils;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -50,11 +51,16 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import com.mojang.serialization.Codec;
+import net.minecraft.core.UUIDUtil;
+import net.minecraft.world.entity.schedule.Activity;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.tslat.smartbrainlib.api.SmartBrainOwner;
-import net.tslat.smartbrainlib.api.core.BrainActivityGroup;
-import net.tslat.smartbrainlib.api.core.SmartBrainProvider;
-import net.tslat.smartbrainlib.api.core.behaviour.FirstApplicableBehaviour;
-import net.tslat.smartbrainlib.api.core.behaviour.OneRandomBehaviour;
+import net.tslat.smartbrainlib.api.core.ActivityBuilder;
+import net.tslat.smartbrainlib.api.internal.SmartBrainProvider;
+import net.tslat.smartbrainlib.api.core.behaviour.base.FirstApplicableBehaviour;
+import net.tslat.smartbrainlib.api.core.behaviour.base.OneRandomBehaviour;
 import net.tslat.smartbrainlib.api.core.behaviour.custom.attack.AnimatableMeleeAttack;
 import net.tslat.smartbrainlib.api.core.behaviour.custom.move.FollowParent;
 import net.tslat.smartbrainlib.api.core.behaviour.custom.move.MoveToWalkTarget;
@@ -65,37 +71,70 @@ import net.tslat.smartbrainlib.api.core.sensor.ExtendedSensor;
 import net.tslat.smartbrainlib.api.core.sensor.custom.NearbyBlocksSensor;
 import net.tslat.smartbrainlib.api.core.sensor.vanilla.NearbyLivingEntitySensor;
 import net.tslat.smartbrainlib.api.core.sensor.vanilla.NearestItemSensor;
-import net.tslat.smartbrainlib.util.BrainUtils;
+import net.tslat.smartbrainlib.util.BrainUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Vector3f;
-import software.bernie.geckolib.animatable.GeoEntity;
-import software.bernie.geckolib.constant.DefaultAnimations;
-import software.bernie.geckolib.core.animatable.GeoAnimatable;
-import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.core.animation.*;
-import software.bernie.geckolib.core.animation.AnimationState;
-import software.bernie.geckolib.core.object.Color;
-import software.bernie.geckolib.core.object.PlayState;
-import software.bernie.geckolib.util.GeckoLibUtil;
+import com.geckolib.animatable.GeoEntity;
+import com.geckolib.animatable.instance.AnimatableInstanceCache;
+import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.animation.AnimationController;
+import com.geckolib.animation.object.PlayState;
+import com.geckolib.animation.state.AnimationTest;
+import com.geckolib.constant.DefaultAnimations;
+import com.geckolib.util.GeckoLibUtil;
+import org.joml.Vector3fc;
 
 import java.util.*;
 
 import static net.dumbcode.projectnublar.util.DinoAnimationUtils.IS_ROARING_STATE;
 
-public abstract class Dinosaur extends TamableAnimal implements FossilRevived, GeoEntity, SmartBrainOwner<Dinosaur>,GeoAnimatable{
+public abstract class Dinosaur extends TamableAnimal implements FossilRevived, GeoEntity, SmartBrainOwner<Dinosaur> {
+
+    // 26.2: synced data accessors must be declared by the entity class itself — NeoForge rejects
+    // definitions from foreign classes, so these live here and DinoNeedsUtils aliases them
+    public static final EntityDataAccessor<Float> HUNGER = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> THIRST = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> STAMINA = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> SOCIAL = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> AGGRESSION = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> FERTILITY = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> DOMESTICITY = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> SIZE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> INTELLIGENCE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> VISION = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> IMMUNITY = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+    public static final EntityDataAccessor<Float> TAMING_SCORE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.FLOAT);
+
+    // animation-state flags (aliased by DinoAnimationUtils)
+    public static final EntityDataAccessor<Boolean> IS_EATING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_DRINKING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_NESTING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_ROARING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_SPEAKING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_SITTING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_RESTING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_RISING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_ATTACKING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_FLINCHING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_DEAD_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_SWIMMING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> IS_RUNNING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> LOOKING_LEFT_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> LOOKING_RIGHT_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> TURNING_LEFT_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    public static final EntityDataAccessor<Boolean> TURNING_RIGHT_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
 
     public static EntityDataAccessor<DinoData> DINO_DATA = SynchedEntityData.defineId(Dinosaur.class, DataSerializerInit.DINO_DATA);
-    public static EntityDataAccessor<CompoundTag> DINO_BEHAVIOUR = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.COMPOUND_TAG);
+    public static EntityDataAccessor<CompoundTag> DINO_BEHAVIOUR = SynchedEntityData.defineId(Dinosaur.class, DataSerializerInit.COMPOUND_TAG);
 
-    public static EntityDataAccessor<Optional<UUID>> DINO_FAMILY_UUID = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.OPTIONAL_UUID);
-    public static EntityDataAccessor<Optional<UUID>> DINO_MATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.OPTIONAL_UUID);
+    public static EntityDataAccessor<Optional<UUID>> DINO_FAMILY_UUID = SynchedEntityData.defineId(Dinosaur.class, DataSerializerInit.OPTIONAL_UUID);
+    public static EntityDataAccessor<Optional<UUID>> DINO_MATE = SynchedEntityData.defineId(Dinosaur.class, DataSerializerInit.OPTIONAL_UUID);
     public static EntityDataAccessor<Boolean> BABY_DATA_ID = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
     public static EntityDataAccessor<Boolean> JUVENILE_DATA_ID = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
     public static EntityDataAccessor<Boolean> SUB_ADULT_DATA_ID = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
     public static EntityDataAccessor<Boolean> ADULT_DATA_ID = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
     public static EntityDataAccessor<Boolean> SHOULD_TICK_STAMINA = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static final EntityDataAccessor<Vector3f> DINOSAUR_HEAD_POS = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.VECTOR3);
+    public static final EntityDataAccessor<Vector3fc> DINOSAUR_HEAD_POS = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.VECTOR3);
 
     public final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     protected @Nullable DinoBehaviourData cachedBehaviourData;
@@ -124,11 +163,11 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     //ANIMATION
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(DefaultAnimations.genericWalkController(this));
-        controllers.add(new AnimationController<GeoAnimatable>(this, "dino_controller",0,this::animationPredicate));
-        controllers.add(new AnimationController<GeoAnimatable>(this, "dino_secondary_Controller",0,this::animationPredicateAmbient));
+        controllers.add(DefaultAnimations.genericWalkController());
+        controllers.add(new AnimationController<>("dino_controller", 0, this::animationPredicate));
+        controllers.add(new AnimationController<>("dino_secondary_Controller", 0, this::animationPredicateAmbient));
     }
-    private <T extends GeoAnimatable> PlayState animationPredicateAmbient(AnimationState<T> state) {
+    private PlayState animationPredicateAmbient(AnimationTest<Dinosaur> state) {
 
     return PlayState.STOP;
 
@@ -155,7 +194,7 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     public void updateParts(){}
     public void updatePart(@Nullable final DinosaurPart part, @NotNull final Dinosaur parent) {}
 
-    private <T extends GeoAnimatable> PlayState animationPredicate(AnimationState<T> state) {
+    private PlayState animationPredicate(AnimationTest<Dinosaur> state) {
         if(this.isDeadOrDying()){
             return state.setAndContinue(DinoAnimationUtils.DEAD_ANIM);
         }
@@ -222,130 +261,129 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     }
     //DATA SYNC
     @Override
-    protected void defineSynchedData() {
-        super.defineSynchedData();
-        this.entityData.define(DINO_DATA, new DinoData());
-        this.entityData.define(DINO_BEHAVIOUR, new CompoundTag());
-        this.entityData.define(DINO_FAMILY_UUID, Optional.empty());
-        this.entityData.define(DINO_MATE, Optional.empty());
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        builder.define(DINO_DATA, new DinoData());
+        builder.define(DINO_BEHAVIOUR, new CompoundTag());
+        builder.define(DINO_FAMILY_UUID, Optional.empty());
+        builder.define(DINO_MATE, Optional.empty());
 
-        this.entityData.define(DinoNeedsUtils.HUNGER, 100.0F);
-        this.entityData.define(DinoNeedsUtils.THIRST, 100.0F);
-        this.entityData.define(DinoNeedsUtils.STAMINA, 100.0F);
-        this.entityData.define(DinoNeedsUtils.SOCIAL, 100.0F);
-        this.entityData.define(DinoNeedsUtils.AGGRESSION, 100.0F);
-        this.entityData.define(DinoNeedsUtils.DOMESTICITY, 100.0F);
-        this.entityData.define(DinoNeedsUtils.FERTILITY, 100.0F);
-        this.entityData.define(DinoNeedsUtils.IMMUNITY, 100.0F);
-        this.entityData.define(DinoNeedsUtils.INTELLIGENCE, 100.0F);
-        this.entityData.define(DinoNeedsUtils.SIZE, 1F);
-        this.entityData.define(DinoNeedsUtils.TAMING_SCORE, 100.0F);
-        this.entityData.define(DinoNeedsUtils.VISION, 100.0F);
+        builder.define(DinoNeedsUtils.HUNGER, 100.0F);
+        builder.define(DinoNeedsUtils.THIRST, 100.0F);
+        builder.define(DinoNeedsUtils.STAMINA, 100.0F);
+        builder.define(DinoNeedsUtils.SOCIAL, 100.0F);
+        builder.define(DinoNeedsUtils.AGGRESSION, 100.0F);
+        builder.define(DinoNeedsUtils.DOMESTICITY, 100.0F);
+        builder.define(DinoNeedsUtils.FERTILITY, 100.0F);
+        builder.define(DinoNeedsUtils.IMMUNITY, 100.0F);
+        builder.define(DinoNeedsUtils.INTELLIGENCE, 100.0F);
+        builder.define(DinoNeedsUtils.SIZE, 1F);
+        builder.define(DinoNeedsUtils.TAMING_SCORE, 100.0F);
+        builder.define(DinoNeedsUtils.VISION, 100.0F);
 
-        this.entityData.define(DINOSAUR_HEAD_POS, new Vector3f());
+        builder.define(DINOSAUR_HEAD_POS, new org.joml.Vector3f());
 
-        this.entityData.define(BABY_DATA_ID, false);
-        this.entityData.define(JUVENILE_DATA_ID, false);
-        this.entityData.define(SUB_ADULT_DATA_ID, false);
-        this.entityData.define(ADULT_DATA_ID, true);
-        this.entityData.define(SHOULD_TICK_STAMINA, true);
+        builder.define(BABY_DATA_ID, false);
+        builder.define(JUVENILE_DATA_ID, false);
+        builder.define(SUB_ADULT_DATA_ID, false);
+        builder.define(ADULT_DATA_ID, true);
+        builder.define(SHOULD_TICK_STAMINA, true);
 
-        this.entityData.define(DinoAnimationUtils.IS_EATING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_DRINKING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_NESTING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_RESTING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_RISING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_SITTING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_ATTACKING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_FLINCHING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_DEAD_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_SWIMMING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_RUNNING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.LOOKING_LEFT_STATE, false);
-        this.entityData.define(DinoAnimationUtils.LOOKING_RIGHT_STATE, false);
-        this.entityData.define(DinoAnimationUtils.TURNING_RIGHT_STATE, false);
-        this.entityData.define(DinoAnimationUtils.TURNING_LEFT_STATE, false);
-        this.entityData.define(IS_ROARING_STATE, false);
-        this.entityData.define(DinoAnimationUtils.IS_SPEAKING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_EATING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_DRINKING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_NESTING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_RESTING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_RISING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_SITTING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_ATTACKING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_FLINCHING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_DEAD_STATE, false);
+        builder.define(DinoAnimationUtils.IS_SWIMMING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_RUNNING_STATE, false);
+        builder.define(DinoAnimationUtils.LOOKING_LEFT_STATE, false);
+        builder.define(DinoAnimationUtils.LOOKING_RIGHT_STATE, false);
+        builder.define(DinoAnimationUtils.TURNING_RIGHT_STATE, false);
+        builder.define(DinoAnimationUtils.TURNING_LEFT_STATE, false);
+        builder.define(IS_ROARING_STATE, false);
+        builder.define(DinoAnimationUtils.IS_SPEAKING_STATE, false);
     }
 
     @Override
-    public void addAdditionalSaveData(CompoundTag tag) {
-        super.addAdditionalSaveData(tag);
-        tag.put("dino_data", this.getDinoData().toNBT());
-        tag.put("behaviour_profile", this.entityData.get(DINO_BEHAVIOUR));
-        tag.putFloat("hunger_bar", this.entityData.get(DinoNeedsUtils.HUNGER));
-        tag.putFloat("thirst_bar", this.entityData.get(DinoNeedsUtils.THIRST));
-        tag.putFloat("stamina_bar", this.entityData.get(DinoNeedsUtils.STAMINA));
-        tag.putFloat("social_bar", this.entityData.get(DinoNeedsUtils.SOCIAL));
-        tag.putFloat("trust_threshold", this.entityData.get(DinoNeedsUtils.TAMING_SCORE));
-        tag.putFloat("dino_vision", this.entityData.get(DinoNeedsUtils.VISION));
-        tag.putFloat("dino_aggression", this.entityData.get(DinoNeedsUtils.AGGRESSION));
-        tag.putFloat("dino_fertility", this.entityData.get(DinoNeedsUtils.FERTILITY));
-        tag.putFloat("dino_domesticity", this.entityData.get(DinoNeedsUtils.DOMESTICITY));
-        tag.putFloat("dino_size", this.entityData.get(DinoNeedsUtils.SIZE));
-        tag.putFloat("dino_intelligence", this.entityData.get(DinoNeedsUtils.INTELLIGENCE));
-        tag.putFloat("dino_immunity", this.entityData.get(DinoNeedsUtils.IMMUNITY));
-        tag.putBoolean("baby_age_boolean", this.entityData.get(BABY_DATA_ID));
-        tag.putBoolean("juvenile_age_boolean", this.entityData.get(JUVENILE_DATA_ID));
-        tag.putBoolean("sub_adult_age_boolean", this.entityData.get(SUB_ADULT_DATA_ID));
-        tag.putBoolean("adult_age_boolean", this.entityData.get(ADULT_DATA_ID));
+    protected void addAdditionalSaveData(ValueOutput output) {
+        super.addAdditionalSaveData(output);
+        output.store("dino_data", CompoundTag.CODEC, this.getDinoData().toNBT());
+        output.store("behaviour_profile", CompoundTag.CODEC, this.entityData.get(DINO_BEHAVIOUR));
+        output.putFloat("hunger_bar", this.entityData.get(DinoNeedsUtils.HUNGER));
+        output.putFloat("thirst_bar", this.entityData.get(DinoNeedsUtils.THIRST));
+        output.putFloat("stamina_bar", this.entityData.get(DinoNeedsUtils.STAMINA));
+        output.putFloat("social_bar", this.entityData.get(DinoNeedsUtils.SOCIAL));
+        output.putFloat("trust_threshold", this.entityData.get(DinoNeedsUtils.TAMING_SCORE));
+        output.putFloat("dino_vision", this.entityData.get(DinoNeedsUtils.VISION));
+        output.putFloat("dino_aggression", this.entityData.get(DinoNeedsUtils.AGGRESSION));
+        output.putFloat("dino_fertility", this.entityData.get(DinoNeedsUtils.FERTILITY));
+        output.putFloat("dino_domesticity", this.entityData.get(DinoNeedsUtils.DOMESTICITY));
+        output.putFloat("dino_size", this.entityData.get(DinoNeedsUtils.SIZE));
+        output.putFloat("dino_intelligence", this.entityData.get(DinoNeedsUtils.INTELLIGENCE));
+        output.putFloat("dino_immunity", this.entityData.get(DinoNeedsUtils.IMMUNITY));
+        output.putBoolean("baby_age_boolean", this.entityData.get(BABY_DATA_ID));
+        output.putBoolean("juvenile_age_boolean", this.entityData.get(JUVENILE_DATA_ID));
+        output.putBoolean("sub_adult_age_boolean", this.entityData.get(SUB_ADULT_DATA_ID));
+        output.putBoolean("adult_age_boolean", this.entityData.get(ADULT_DATA_ID));
 
 
         if(headBonePos != null){
-            tag.putDouble("headx",headBonePos.x);
-            tag.putDouble("heady",headBonePos.y);
-            tag.putDouble("headz",headBonePos.z);
+            output.putDouble("headx",headBonePos.x);
+            output.putDouble("heady",headBonePos.y);
+            output.putDouble("headz",headBonePos.z);
         }
 
         if(this.entityData.get(DINO_MATE).isPresent()) {
-            tag.putUUID("mate_uuid",this.entityData.get(DINO_MATE).get());
+            output.store("mate_uuid", UUIDUtil.CODEC, this.entityData.get(DINO_MATE).get());
         }
         if(this.entityData.get(DINO_FAMILY_UUID).isPresent()) {
-            tag.putUUID("family_uuid",this.entityData.get(DINO_FAMILY_UUID).get());
+            output.store("family_uuid", UUIDUtil.CODEC, this.entityData.get(DINO_FAMILY_UUID).get());
         }
     }
 
     @Override
-    public void readAdditionalSaveData(CompoundTag pTag) {
-        super.readAdditionalSaveData(pTag);
-        entityData.set(DINO_DATA, DinoData.fromNBT(pTag.getCompound("dino_data")));
-        this.entityData.set(DINO_BEHAVIOUR, pTag.getCompound("behaviour_profile"));
-        this.entityData.set(DinoNeedsUtils.HUNGER, pTag.getFloat("hunger_bar"));
-        this.entityData.set(DinoNeedsUtils.THIRST, pTag.getFloat("thirst_bar"));
-        this.entityData.set(DinoNeedsUtils.STAMINA, pTag.getFloat("stamina_bar"));
-        this.entityData.set(DinoNeedsUtils.SOCIAL, pTag.getFloat("social_bar"));
-        this.entityData.set(BABY_DATA_ID, pTag.getBoolean("baby_age_boolean"));
-        this.entityData.set(JUVENILE_DATA_ID, pTag.getBoolean("baby_age_boolean"));
-        this.entityData.set(SUB_ADULT_DATA_ID, pTag.getBoolean("baby_age_boolean"));
-        this.entityData.set(ADULT_DATA_ID, pTag.getBoolean("baby_age_boolean"));
-        this.entityData.set(DinoNeedsUtils.TAMING_SCORE,pTag.getFloat("trust_threshold"));
-        this.entityData.set(DinoNeedsUtils.VISION,pTag.getFloat("dino_vision"));
-        this.entityData.set(DinoNeedsUtils.AGGRESSION,pTag.getFloat("dino_aggression"));
-        this.entityData.set(DinoNeedsUtils.FERTILITY,pTag.getFloat("dino_fertility"));
-        this.entityData.set(DinoNeedsUtils.DOMESTICITY,pTag.getFloat("dino_domesticity"));
-        this.entityData.set(DinoNeedsUtils.SIZE,pTag.getFloat("dino_size"));
-        this.entityData.set(DinoNeedsUtils.INTELLIGENCE,pTag.getFloat("dino_intelligence"));
-        this.entityData.set(DinoNeedsUtils.IMMUNITY,pTag.getFloat("dino_immunity"));
+    protected void readAdditionalSaveData(ValueInput input) {
+        super.readAdditionalSaveData(input);
+        entityData.set(DINO_DATA, DinoData.fromNBT(input.read("dino_data", CompoundTag.CODEC).orElseGet(CompoundTag::new)));
+        this.entityData.set(DINO_BEHAVIOUR, input.read("behaviour_profile", CompoundTag.CODEC).orElseGet(CompoundTag::new));
+        this.entityData.set(DinoNeedsUtils.HUNGER, input.getFloatOr("hunger_bar", 100.0F));
+        this.entityData.set(DinoNeedsUtils.THIRST, input.getFloatOr("thirst_bar", 100.0F));
+        this.entityData.set(DinoNeedsUtils.STAMINA, input.getFloatOr("stamina_bar", 100.0F));
+        this.entityData.set(DinoNeedsUtils.SOCIAL, input.getFloatOr("social_bar", 100.0F));
+        this.entityData.set(BABY_DATA_ID, input.getBooleanOr("baby_age_boolean", false));
+        this.entityData.set(JUVENILE_DATA_ID, input.getBooleanOr("baby_age_boolean", false));
+        this.entityData.set(SUB_ADULT_DATA_ID, input.getBooleanOr("baby_age_boolean", false));
+        this.entityData.set(ADULT_DATA_ID, input.getBooleanOr("baby_age_boolean", false));
+        this.entityData.set(DinoNeedsUtils.TAMING_SCORE, input.getFloatOr("trust_threshold", 100.0F));
+        this.entityData.set(DinoNeedsUtils.VISION, input.getFloatOr("dino_vision", 100.0F));
+        this.entityData.set(DinoNeedsUtils.AGGRESSION, input.getFloatOr("dino_aggression", 100.0F));
+        this.entityData.set(DinoNeedsUtils.FERTILITY, input.getFloatOr("dino_fertility", 100.0F));
+        this.entityData.set(DinoNeedsUtils.DOMESTICITY, input.getFloatOr("dino_domesticity", 100.0F));
+        this.entityData.set(DinoNeedsUtils.SIZE, input.getFloatOr("dino_size", 1.0F));
+        this.entityData.set(DinoNeedsUtils.INTELLIGENCE, input.getFloatOr("dino_intelligence", 100.0F));
+        this.entityData.set(DinoNeedsUtils.IMMUNITY, input.getFloatOr("dino_immunity", 100.0F));
 
-        if(pTag.contains("headx") && pTag.contains("heady") && pTag.contains("headz")){
-           headBonePos = new Vec3(pTag.getDouble("headx"),pTag.getDouble("heady"),pTag.getDouble("headz"));
+        double headx = input.getDoubleOr("headx", Double.NaN);
+        double heady = input.getDoubleOr("heady", Double.NaN);
+        double headz = input.getDoubleOr("headz", Double.NaN);
+        if(!Double.isNaN(headx) && !Double.isNaN(heady) && !Double.isNaN(headz)){
+           headBonePos = new Vec3(headx, heady, headz);
         }
 
-        if(pTag.contains("mate_uuid")){
-            Optional<UUID> mate_uuid = Optional.of(pTag.getUUID("mate_uuid"));
-            this.entityData.set(DINO_MATE, mate_uuid);
-        } else this.entityData.set(DINO_MATE, Optional.empty());
+        Optional<UUID> mateUuid = input.read("mate_uuid", UUIDUtil.CODEC);
+        this.entityData.set(DINO_MATE, mateUuid);
 
-        if(pTag.contains("family_uuid")){
-            Optional<UUID> mate_uuid = Optional.of(pTag.getUUID("family_uuid"));
-            this.entityData.set(DINO_FAMILY_UUID, mate_uuid);
-        } else this.entityData.set(DINO_FAMILY_UUID, Optional.empty());
+        Optional<UUID> familyUuid = input.read("family_uuid", UUIDUtil.CODEC);
+        this.entityData.set(DINO_FAMILY_UUID, familyUuid);
 
     }
 
     public void setHeadPositon(Vec3 worldPos){
-      Vector3f pos = worldPos.toVector3f();
+      org.joml.Vector3f pos = worldPos.toVector3f();
       this.entityData.set(DINOSAUR_HEAD_POS, pos);
     }
     public @Nullable Vec3 getHeadBonePos(){
@@ -380,16 +418,16 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     }
 
     @Override
-    public boolean wantsToPickUp(ItemStack stack) {
+    public boolean wantsToPickUp(ServerLevel level, ItemStack stack) {
         if(this.isSleeping()){
             return false;
         }
         DinoDietData validfood = DietReloadListener.getDietInfoForType(this.getDinoBehaviour().dietID());
-        return validfood.foodMap().containsKey(stack.getDescriptionId());
+        return validfood.foodMap().containsKey(stack.getItem().getDescriptionId());
     }
 
     public boolean hurtFromPart(DinosaurPart part, DamageSource source, float amount) {
-        return this.hurt(this.damageSources().generic(), amount);
+        return this.hurtServer((ServerLevel) this.level(), source, amount);
     }
 
     public boolean canTarget(LivingEntity target) {
@@ -401,8 +439,8 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     }
 
     public boolean isHuntingBlocked(){
-        return BrainUtils.hasMemory(this, MemoryModuleTypeInit.IS_RESTING.get()) ||BrainUtils.hasMemory(this, MemoryModuleType.NEAREST_VISIBLE_WANTED_ITEM) || BrainUtils.hasMemory(this, MemoryModuleTypeInit.IS_EATING.get()) ||
-                BrainUtils.hasMemory(this, MemoryModuleTypeInit.IS_DRINKING.get());
+        return BrainUtil.hasMemory(this, MemoryModuleTypeInit.IS_RESTING.get()) ||BrainUtil.hasMemory(this, MemoryModuleType.NEAREST_VISIBLE_WANTED_ITEM) || BrainUtil.hasMemory(this, MemoryModuleTypeInit.IS_EATING.get()) ||
+                BrainUtil.hasMemory(this, MemoryModuleTypeInit.IS_DRINKING.get());
     }
 
     public boolean canTargetFeeder(BlockState target){
@@ -419,13 +457,13 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
         if(this.getDinoDiet() == null){
             return false;
         }
-        return this.getDinoDiet().foodMap().containsKey(target.getItem().getDescriptionId());
+        return this.getDinoDiet().foodMap().containsKey(target.getItem().getItem().getDescriptionId());
     }
 
     @Override
     public boolean isFood(ItemStack stack) {
         DinoDietData validfood = DietReloadListener.getDietInfoForType(this.getDinoBehaviour().dietID());
-        return validfood.foodMap().containsKey(stack.getDescriptionId());
+        return validfood.foodMap().containsKey(stack.getItem().getDescriptionId());
     }
 
     @Override
@@ -479,37 +517,28 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     //BRAIN
 
     @Override
-    protected Brain.Provider<Dinosaur> brainProvider() {
-        return new SmartBrainProvider<>(this);
-    }
-
-
-
-    @Override
-    public double getMeleeAttackRangeSqr(LivingEntity entity) {
-        return (double)(this.getBbWidth() * 3.0F * this.getBbWidth() * 3.0F + entity.getBbWidth());
+    protected Brain<? extends LivingEntity> makeBrain(Brain.Packed packed) {
+        return new SmartBrainProvider<>(this).makeBrain(this, packed);
     }
 
     @Override
-    protected void customServerAiStep() {
-        super.customServerAiStep();
-        this.tickBrain(this);
-
+    public boolean isWithinMeleeAttackRange(LivingEntity entity) {
+        return this.distanceToSqr(entity) < (double)(this.getBbWidth() * 3.0F * this.getBbWidth() * 3.0F + entity.getBbWidth());
     }
 
     @Override
-    public List<? extends ExtendedSensor<? extends Dinosaur>> getSensors() {
+    public List<? extends ExtendedSensor<?>> getSensors(Dinosaur dinosaur) {
         NearestWaterSourceSensor<Dinosaur> waterSourceSensor = new NearestWaterSourceSensor<>();
-        waterSourceSensor.setPredicate((block, dinosaur) -> dinosaur.canTargetWaterSource(block));
+        waterSourceSensor.setPredicate((dino, state) -> dino.canTargetWaterSource(state));
         waterSourceSensor.setRadius(20);
         NearestFeederSensor<Dinosaur> feederSensor = new NearestFeederSensor<>();
-        feederSensor.setPredicate((block, dinosaur) -> dinosaur.canTargetFeeder(block));
+        feederSensor.setPredicate((dino, state) -> dino.canTargetFeeder(state));
         feederSensor.setRadius(20);
         NearbyBlocksSensor<Dinosaur> fenceProximinitySensor = new NearbyBlocksSensor<>();
-        fenceProximinitySensor.setRadius(10.0);
-        fenceProximinitySensor.setPredicate((block, dinosaur) -> block.is(BlockInit.ELECTRIC_FENCE.get()) && DinoNeedsUtils.starving(dinosaur));
+        fenceProximinitySensor.detectionRadius(10.0);
+        fenceProximinitySensor.setPredicate((dino, posState) -> posState.getSecond().is(BlockInit.ELECTRIC_FENCE.get()) && DinoNeedsUtils.starving(dino));
         NearestItemSensor<Dinosaur> foodItemSensor = new NearestItemSensor<>();
-        foodItemSensor.setPredicate((item, dinosaur) -> dinosaur.canTargetFoodItem(item)) ;
+        foodItemSensor.setPredicate((dino, item) -> dino.canTargetFoodItem(item)) ;
         foodItemSensor.setRadius(20);
         NearbyLivingEntitySensor<Dinosaur> nearbyLivingEntitySensor = new NearbyLivingEntitySensor<>();
         return List.of(
@@ -523,13 +552,13 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
 
 
     @Override
-    public BrainActivityGroup<? extends Dinosaur> getCoreTasks() {
-        return BrainActivityGroup.coreTasks(
-                new DinosaurLookAtTarget<>().stopIf((entity) -> (entity instanceof Dinosaur dinosaur) && (dinosaur.isResting() || dinosaur.isDrinking() || dinosaur.isDeadOrDying())),
+    public ActivityBuilder<Dinosaur> getCoreBehaviourGroup(Dinosaur dinosaur) {
+        return ActivityBuilder.<Dinosaur>create(Activity.CORE).behaviourPriorityBase(0).behaviours(
+                new DinosaurLookAtTarget<>().stopIf((entity) -> (entity instanceof Dinosaur dino) && (dino.isResting() || dino.isDrinking() || dino.isDeadOrDying())),
             //   new ThreatDisplay<>(34) //- needs to be made more situational so it happens more
-              //      .whenStarting(dinosaur -> dinosaur.entityData.set(IS_ROARING_STATE, true))
-                //    .whenStopping(dinosaur -> dinosaur.entityData.set(IS_ROARING_STATE,false)),
-                new MoveToWalkTarget<>().stopIf((entity) -> (entity instanceof Dinosaur dinosaur) && (dinosaur.isResting() || dinosaur.isDrinking() || dinosaur.isDeadOrDying())) ,
+              //      .whenStarting(dino -> dino.entityData.set(IS_ROARING_STATE, true))
+                //    .whenStopping(dino -> dino.entityData.set(IS_ROARING_STATE,false)),
+                new MoveToWalkTarget<>().stopIf((entity) -> (entity instanceof Dinosaur dino) && (dino.isResting() || dino.isDrinking() || dino.isDeadOrDying())) ,
                 new SetHunting<>(),
                 new SetWalkTargetToWaterSource<>().closeEnoughWhen((entity, pos)-> 3),
                 new WalkToNearestFeeder<>().closeEnoughWhen((entity, pos) -> 3) ,
@@ -540,48 +569,48 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
 
 
     @Override
-    public BrainActivityGroup<? extends Dinosaur> getIdleTasks() {
-        return BrainActivityGroup.idleTasks(
+    public ActivityBuilder<Dinosaur> getIdleBehaviourGroup(Dinosaur dinosaur) {
+        return ActivityBuilder.<Dinosaur>create(Activity.IDLE).behaviourPriorityBase(50).behaviours(
                 new FirstApplicableBehaviour(
                 //        new Panic<>(),
                         new Drink<>(100)
-                                .whenStarting(dinosaur -> DinoAnimationUtils.setAnimationState(dinosaur,"drink",true))
-                                .whenStopping(dinosaur ->  DinoAnimationUtils.setAnimationState(dinosaur,"drink",false)),
+                                .whenStarting(dino -> DinoAnimationUtils.setAnimationState(dino,"drink",true))
+                                .whenStopping(dino ->  DinoAnimationUtils.setAnimationState(dino,"drink",false)),
                         new EatFromMeatFeeder<>(20)
-                                .whenStarting(dinosaur -> DinoAnimationUtils.setAnimationState(dinosaur,"eat",true))
-                                .whenStopping(dinosaur ->  DinoAnimationUtils.setAnimationState(dinosaur,"eat",false)),
+                                .whenStarting(dino -> DinoAnimationUtils.setAnimationState(dino,"eat",true))
+                                .whenStopping(dino ->  DinoAnimationUtils.setAnimationState(dino,"eat",false)),
                         new Eat<>(69)
-                                .whenStarting(dinosaur -> DinoAnimationUtils.setAnimationState(dinosaur,"eat",true))
-                                .whenStopping(dinosaur ->  DinoAnimationUtils.setAnimationState(dinosaur,"eat",false)),
+                                .whenStarting(dino -> DinoAnimationUtils.setAnimationState(dino,"eat",true))
+                                .whenStopping(dino ->  DinoAnimationUtils.setAnimationState(dino,"eat",false)),
                         new Rest<>(69)
-                                .whenStarting(dinosaur -> DinoAnimationUtils.setAnimationState(dinosaur,"sit",true))
-                                .whenStopping(dinosaur -> DinoAnimationUtils.setAnimationState(dinosaur,"rest",false)),
+                                .whenStarting(dino -> DinoAnimationUtils.setAnimationState(dino,"sit",true))
+                                .whenStopping(dino -> DinoAnimationUtils.setAnimationState(dino,"rest",false)),
                         new GettingUpFromRestBehaviour<>(69)
-                                .whenStarting(dinosaur -> DinoAnimationUtils.setAnimationState(dinosaur,"getup",true))
-                                .whenStopping(dinosaur ->DinoAnimationUtils.setAnimationState(dinosaur,"getup",false)),
+                                .whenStarting(dino -> DinoAnimationUtils.setAnimationState(dino,"getup",true))
+                                .whenStopping(dino ->DinoAnimationUtils.setAnimationState(dino,"getup",false)),
                        new SoloHuntingBehaviour<>()
                                 .attackablePredicate(entity -> canTarget(entity))
-                                .startCondition(dinosaur -> dinosaur instanceof CarnivoreDinosaur),
+                                .startCondition(dino -> dino instanceof CarnivoreDinosaur),
                         new SoloHuntRoamBehaviour<>()
                                 .dontAvoidWater()
                                 .setRadius(40.0D)
-                                .stopIf(dino -> BrainUtils.hasMemory(dino, MemoryModuleType.ATTACK_TARGET)),
+                                .stopIf(dino -> BrainUtil.hasMemory(dino, MemoryModuleType.ATTACK_TARGET)),
                 new OneRandomBehaviour<>(
-                        new SetRandomWalkTarget<>().dontAvoidWater().setRadius(10.0, 4.0).walkTargetPredicate((dinosaur, pos)-> !BrainUtils.hasMemory(dinosaur, MemoryModuleTypeInit.BRAIN_OVERRIDE.get()))
+                        new SetRandomWalkTarget<>().dontAvoidWater().setRadius(10.0, 4.0).isValidPositionIf((dino, pos)-> !BrainUtil.hasMemory(dino, MemoryModuleTypeInit.BRAIN_OVERRIDE.get()))
                 )));
     }
 
     @Override
-    public BrainActivityGroup<? extends Dinosaur> getFightTasks() {
-        return BrainActivityGroup.fightTasks(
+    public ActivityBuilder<Dinosaur> getFightingBehaviourGroup(Dinosaur dinosaur) {
+        return ActivityBuilder.<Dinosaur>create(Activity.FIGHT).behaviourPriorityBase(50).behaviours(
                 new InvalidateAttackTarget<>()
                         .invalidateIf((entity, target) -> (target instanceof Player pl && (pl.isCreative() || pl.isSpectator())) || target.isDeadOrDying()),
-                new SetWalkTargetToAttackTarget<>().speedMod((owner, target) -> 1.5f)
-                        .whenStarting(dinosaur -> DinoAnimationUtils.setAnimationState((Dinosaur) dinosaur,"run",true)),
+                new SetWalkTargetToAttackTarget<>().speedModifier((owner, target) -> 1.5f)
+                        .whenStarting(dino -> DinoAnimationUtils.setAnimationState((Dinosaur) dino,"run",true)),
                 new BreakFenceBehaviour<>(20),
                 new AnimatableMeleeAttack<>(20)
-                        .whenStarting(dinosaur -> DinoAnimationUtils.setAnimationState((Dinosaur) dinosaur,"attack",true))
-                        .whenStopping(dinosaur -> DinoAnimationUtils.setAnimationState((Dinosaur) dinosaur,"attack",false))
+                        .whenStarting(dino -> DinoAnimationUtils.setAnimationState((Dinosaur) dino,"attack",true))
+                        .whenStopping(dino -> DinoAnimationUtils.setAnimationState((Dinosaur) dino,"attack",false))
         );
     }
     private int flinchAnimTicks;
@@ -643,8 +672,8 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
 
             if(this.staminaDrainTick >= 20 && this.shouldTickStamina()){
                 DinoNeedsUtils.tickStamina(this);
-                if(DinoNeedsUtils.isTired(this) && !BrainUtils.hasMemory(this, MemoryModuleTypeInit.IS_TIRED.get())){
-                    BrainUtils.setMemory(this, MemoryModuleTypeInit.IS_TIRED.get(), true);
+                if(DinoNeedsUtils.isTired(this) && !BrainUtil.hasMemory(this, MemoryModuleTypeInit.IS_TIRED.get())){
+                    BrainUtil.setMemory(this, MemoryModuleTypeInit.IS_TIRED.get(), true);
                 }
                 this.staminaDrainTick = 0;
             }
@@ -664,35 +693,35 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
                 this.socialDrainTick = 0;
             }
 
-            if(cachedDayTime != (int) this.level().getDayTime() / 24000L){
-                cachedDayTime = (int) (this.level().getDayTime() / 24000L);
+            if(cachedDayTime != (int) this.level().getOverworldClockTime() / 24000L){
+                cachedDayTime = (int) (this.level().getOverworldClockTime() / 24000L);
                 this.isNewDay = true;
             }
             if(this.isNewDay){
-                boolean eatenToday = Boolean.TRUE.equals(BrainUtils.getMemory(this, MemoryModuleTypeInit.EATEN_TODAY.get()));
-                boolean drankToday = Boolean.TRUE.equals(BrainUtils.getMemory(this, MemoryModuleTypeInit.DRANK_TODAY.get()));
+                boolean eatenToday = Boolean.TRUE.equals(BrainUtil.getMemory(this, MemoryModuleTypeInit.EATEN_TODAY.get()));
+                boolean drankToday = Boolean.TRUE.equals(BrainUtil.getMemory(this, MemoryModuleTypeInit.DRANK_TODAY.get()));
                 if(!eatenToday){
-                    if(BrainUtils.hasMemory(this,MemoryModuleTypeInit.DAYS_SINCE_LAST_FED.get())) {
-                        daysSincelastAte = BrainUtils.getMemory(this,MemoryModuleTypeInit.DAYS_SINCE_LAST_FED.get());
+                    if(BrainUtil.hasMemory(this,MemoryModuleTypeInit.DAYS_SINCE_LAST_FED.get())) {
+                        daysSincelastAte = BrainUtil.getMemory(this,MemoryModuleTypeInit.DAYS_SINCE_LAST_FED.get());
                     } else { daysSincelastAte = 0; }
                         daysSincelastAte++;
 
-                    BrainUtils.setMemory(this, MemoryModuleTypeInit.DAYS_SINCE_LAST_FED.get(), daysSincelastAte);
+                    BrainUtil.setMemory(this, MemoryModuleTypeInit.DAYS_SINCE_LAST_FED.get(), daysSincelastAte);
                 }
                 if(!drankToday){
-                    if(BrainUtils.hasMemory(this,MemoryModuleTypeInit.DAYS_SINCE_LAST_DRANK.get())) {
-                        daysSincelastDrink = BrainUtils.getMemory(this,MemoryModuleTypeInit.DAYS_SINCE_LAST_DRANK.get());
+                    if(BrainUtil.hasMemory(this,MemoryModuleTypeInit.DAYS_SINCE_LAST_DRANK.get())) {
+                        daysSincelastDrink = BrainUtil.getMemory(this,MemoryModuleTypeInit.DAYS_SINCE_LAST_DRANK.get());
                     } else { daysSincelastDrink = 0;}
 
                     daysSincelastDrink++;
 
-                    BrainUtils.setMemory(this, MemoryModuleTypeInit.DAYS_SINCE_LAST_DRANK.get(), daysSincelastDrink);
+                    BrainUtil.setMemory(this, MemoryModuleTypeInit.DAYS_SINCE_LAST_DRANK.get(), daysSincelastDrink);
                 }
 
                 this.isNewDay = false;
-                BrainUtils.setMemory(this,MemoryModuleTypeInit.MEAL_COUNTER.get(), 0);
-                BrainUtils.setMemory(this, MemoryModuleTypeInit.DRANK_TODAY.get(), false);
-                BrainUtils.setMemory(this, MemoryModuleTypeInit.EATEN_TODAY.get(), false);
+                BrainUtil.setMemory(this,MemoryModuleTypeInit.MEAL_COUNTER.get(), 0);
+                BrainUtil.setMemory(this, MemoryModuleTypeInit.DRANK_TODAY.get(), false);
+                BrainUtil.setMemory(this, MemoryModuleTypeInit.EATEN_TODAY.get(), false);
                 DinoNeedsUtils.tickThirst(this,this.daysSincelastDrink,this.getDinoBehaviour().dehydrationLimit());
                 DinoNeedsUtils.tickHunger(this,this.daysSincelastAte,this.getDinoBehaviour().starvationLimit());
 
@@ -722,7 +751,7 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
                 int i = 0;
 
                 for (long thirstTime : thirstSchedule) {
-                    if (this.level().getDayTime() % 24000 >= thirstTime) {
+                    if (this.level().getOverworldClockTime() % 24000 >= thirstTime) {
                         toRemove = i;
                         DinoNeedsUtils.tickThirst(this, this.daysSincelastDrink, this.getDinoBehaviour().dehydrationLimit());
                     }
@@ -737,7 +766,7 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
                 int i = 0;
 
                 for (long hungerTime : hungerSchedule) {
-                    if (this.level().getDayTime() % 24000 >= hungerTime) {
+                    if (this.level().getOverworldClockTime() % 24000 >= hungerTime) {
                         toRemove = i;
                         DinoNeedsUtils.tickHunger(this, this.daysSincelastAte, this.getDinoBehaviour().starvationLimit());
                     }
@@ -747,8 +776,8 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
                     hungerSchedule.remove(toRemove);
                 }
             }
-            if(!DinoNeedsUtils.isHungry(this) && BrainUtils.hasMemory(this, MemoryModuleTypeInit.HUNTING.get())){
-                BrainUtils.clearMemory(this, MemoryModuleTypeInit.HUNTING.get());
+            if(!DinoNeedsUtils.isHungry(this) && BrainUtil.hasMemory(this, MemoryModuleTypeInit.HUNTING.get())){
+                BrainUtil.clearMemory(this, MemoryModuleTypeInit.HUNTING.get());
             }
         }
     }
@@ -758,7 +787,7 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
         int attempt = random.nextInt(0,100);
         if(attempt > 50) {
             this.setInLove(null);
-            @Nullable Dinosaur mate = BrainUtils.getMemory(this, MemoryModuleTypeInit.MATE.get());
+            @Nullable Dinosaur mate = BrainUtil.getMemory(this, MemoryModuleTypeInit.MATE.get());
 
             if(mate != null) {
                 mate.setInLove(null);
@@ -769,7 +798,7 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     }
 
     public boolean isNight(){
-        int day = (int) this.level().getDayTime() % 24000;
+        int day = (int) this.level().getOverworldClockTime() % 24000;
         return day > 12000;
     }
     public boolean isDay(){
@@ -785,16 +814,16 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
                 .add(Attributes.ATTACK_DAMAGE, 3)
                 .add(Attributes.ARMOR, 2)
                 .add(Attributes.SPAWN_REINFORCEMENTS_CHANCE)
-                .add(AttributesInit.DINO_ENERGY_NEED.get(),100)
-                .add(AttributesInit.DINO_THIRST_NEED.get(), 100)
-                .add(AttributesInit.DINO_HUNGER_NEED.get(),100)
-                .add(AttributesInit.DINO_SOCIAL_NEED.get(),100)
-                .add(AttributesInit.TRUST_SCORE.get(),1000)
-                .add(AttributesInit.DINO_VISION.get(),100)
-                .add(AttributesInit.DINO_AGGRESSION.get(), 0)
-                .add(AttributesInit.DINO_INTELLIGENCE.get(), 50)
-                .add(AttributesInit.DINO_FERTILITY.get(),50)
-                .add(AttributesInit.DINO_IMMUNITY.get(),0);
+                .add(AttributesInit.DINO_ENERGY_NEED.holder(),100)
+                .add(AttributesInit.DINO_THIRST_NEED.holder(), 100)
+                .add(AttributesInit.DINO_HUNGER_NEED.holder(),100)
+                .add(AttributesInit.DINO_SOCIAL_NEED.holder(),100)
+                .add(AttributesInit.TRUST_SCORE.holder(),1000)
+                .add(AttributesInit.DINO_VISION.holder(),100)
+                .add(AttributesInit.DINO_AGGRESSION.holder(), 0)
+                .add(AttributesInit.DINO_INTELLIGENCE.holder(), 50)
+                .add(AttributesInit.DINO_FERTILITY.holder(),50)
+                .add(AttributesInit.DINO_IMMUNITY.holder(),0);
     }
 
     public boolean isDrinking() {
@@ -826,8 +855,8 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     }
     @Nullable
     public Map<Player,Integer> getPlayerReputationMap(){
-        if(BrainUtils.hasMemory(this, MemoryModuleTypeInit.PLAYER_REPUTATION.get())){
-            return BrainUtils.getMemory(this, MemoryModuleTypeInit.PLAYER_REPUTATION.get());
+        if(BrainUtil.hasMemory(this, MemoryModuleTypeInit.PLAYER_REPUTATION.get())){
+            return BrainUtil.getMemory(this, MemoryModuleTypeInit.PLAYER_REPUTATION.get());
         } else return null;
     }
 
@@ -858,7 +887,7 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     @Override
     public @Nullable AgeableMob getBreedOffspring(ServerLevel serverLevel, AgeableMob ageableMob) {
         EntityType<?> babyType = this.getDinoData().getBaseDino();
-        return (Dinosaur) babyType.create(serverLevel);
+        return (Dinosaur) babyType.create(serverLevel, EntitySpawnReason.BREEDING);
     }
 
     @Override
@@ -874,20 +903,15 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
                 dinosaur.setDinoData(mother.getDinoData());
                 DinoNeedsUtils.setDinoBaseNeeds(dinosaur, mother.getDinoBehaviour());
                 dinosaur.setDinoBehaviour(mother.getDinoBehaviour().toNBT(mother.getDinoBehaviour()));
-                dinosaur.getDinoData().setGeneValue(GeneInit.GENDER.get(), random.nextInt(1,2));
+                // nextInt(1,2) is always 1 — every bred baby was female; roll 1 or 2
+                dinosaur.getDinoData().setGeneValue(GeneInit.GENDER.get(), random.nextInt(1,3));
                 dinosaur.setBaby(true);
                 dinosaur.setDinoFamilyUuid(this.getFamilyId());
-                dinosaur.moveTo(this.getX(), this.getY(), this.getZ(), 0.0F, 0.0F);
+                dinosaur.snapTo(this.getX(), this.getY(), this.getZ(), 0.0F, 0.0F);
                 this.finalizeSpawnChildFromBreeding(level, mate, dinosaur);
                 level.addFreshEntityWithPassengers(dinosaur);
             }
         }
-    }
-
-    @Override
-    public boolean isBaby() {
-        int age = this.age;
-        return age <= -18000;
     }
 
     public boolean isJuvanile(){
@@ -933,18 +957,18 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     }
 
     public @Nullable UUID getGroupId() {
-        if(BrainUtils.hasMemory(this, MemoryModuleTypeInit.GROUP_UUID.get())){
-            return BrainUtils.getMemory(this, MemoryModuleTypeInit.GROUP_UUID.get());
+        if(BrainUtil.hasMemory(this, MemoryModuleTypeInit.GROUP_UUID.get())){
+            return BrainUtil.getMemory(this, MemoryModuleTypeInit.GROUP_UUID.get());
         } else return null;
     }
     public boolean hasGroup() {
-        if(BrainUtils.hasMemory(this,MemoryModuleTypeInit.HAS_GROUP.get())) {
-            return Boolean.TRUE.equals(BrainUtils.getMemory(this, MemoryModuleTypeInit.HAS_GROUP.get()));
+        if(BrainUtil.hasMemory(this,MemoryModuleTypeInit.HAS_GROUP.get())) {
+            return Boolean.TRUE.equals(BrainUtil.getMemory(this, MemoryModuleTypeInit.HAS_GROUP.get()));
         } else return false;
     }
     public boolean isGroupLeader() {
-        if(BrainUtils.hasMemory(this, MemoryModuleTypeInit.IS_GROUP_LEADER.get())){
-            return Boolean.TRUE.equals(BrainUtils.getMemory(this, MemoryModuleTypeInit.IS_GROUP_LEADER.get()));
+        if(BrainUtil.hasMemory(this, MemoryModuleTypeInit.IS_GROUP_LEADER.get())){
+            return Boolean.TRUE.equals(BrainUtil.getMemory(this, MemoryModuleTypeInit.IS_GROUP_LEADER.get()));
         } else return false;
     }
 
@@ -963,7 +987,7 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
         ItemStack itemStack = player.getItemInHand(hand);
         Item item = itemStack.getItem();
 
-        if (this.level().isClientSide) {
+        if (this.level().isClientSide()) {
             boolean flag = this.isOwnedBy(player) || this.isTame() || itemStack.is(Items.STICK) && !(this.getLastHurtByMob() != null && this.getLastAttacker().is(player));
             return flag ? InteractionResult.CONSUME : InteractionResult.PASS;
         } else if (this.isTame()) {
@@ -971,7 +995,7 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
                 if (!player.getAbilities().instabuild) {
                     itemStack.shrink(1);
                 }
-                this.heal((float) item.getFoodProperties().getNutrition());
+                this.heal(itemStack.get(DataComponents.FOOD).nutrition());
                 return InteractionResult.SUCCESS;
             } else {
                 InteractionResult interactionresult = super.mobInteract(player, hand);
@@ -1054,14 +1078,16 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     }
 
     //SKIN SETTER
-    public Color layerColor(int layer, DinoLayer dinoLayer) {
+    public int layerColor(int layer, DinoLayer dinoLayer) {
+        // GeckoLib 5 takes the color int directly as the vertex ARGB color, so force alpha
+        // (the stored layer colors are RGB-only — alpha 0 would render the pass transparent)
         if (dinoLayer != null && dinoLayer.getBasicLayer() == -1) {
-            return Color.WHITE;
+            return 0xFFFFFFFF;
         }
         if (layer >= this.getDinoData().getLayerColors().stream().count()) {
-            return new Color(Mth.floor(this.getDinoData().getLayerColor(dinoLayer.getBasicLayer())));
+            return 0xFF000000 | Mth.floor(this.getDinoData().getLayerColor(dinoLayer.getBasicLayer()));
         }
-        return new Color(Mth.floor(this.getDinoData().getLayerColor(layer)));
+        return 0xFF000000 | Mth.floor(this.getDinoData().getLayerColor(layer));
     }
 
     public @Nullable SoundEvent getRoarSound(){
@@ -1075,16 +1101,16 @@ public abstract class Dinosaur extends TamableAnimal implements FossilRevived, G
     }
 
     @Override
-    protected void actuallyHurt(DamageSource damageSource, float damageAmount) {
+    protected void actuallyHurt(ServerLevel level, DamageSource damageSource, float damageAmount) {
         if(damageSource.getEntity() instanceof Player player){
             this.decreaseReputationForPlayer(player, 20);
             if(this.isTame() && this.getOwner().is(player) && this.getReputationForPlayer(player) < 40){
-                this.setTame(false);
-                this.setOwnerUUID(null);
+                this.setTame(false, false);
+                this.setOwnerReference(null);
             }
         }
         DinoAnimationUtils.setAnimationState(this,"flinch", true);
-        super.actuallyHurt(damageSource, damageAmount);
+        super.actuallyHurt(level, damageSource, damageAmount);
 
     }
 }

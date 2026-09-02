@@ -1,29 +1,14 @@
 package net.dumbcode.projectnublar.client.model;
 
+import com.geckolib.model.DefaultedEntityGeoModel;
 import net.dumbcode.projectnublar.entity.dinosaur.Dinosaur;
-import net.minecraft.resources.ResourceLocation;
-import software.bernie.geckolib.core.animation.AnimationState;
-import software.bernie.geckolib.model.DefaultedEntityGeoModel;
+import net.minecraft.resources.Identifier;
 
+// NOTE: currently unreferenced by any live code. The 1.20.1 no-op getTextureResource/
+// setCustomAnimations overrides and the `turnsHead` ctor have no GeckoLib 5 equivalent.
 public class DinosaurGeoModel extends DefaultedEntityGeoModel<Dinosaur> {
 
-    public DinosaurGeoModel(ResourceLocation assetSubpath) {
+    public DinosaurGeoModel(Identifier assetSubpath) {
         super(assetSubpath);
-    }
-
-    public DinosaurGeoModel(ResourceLocation assetSubpath, boolean turnsHead) {
-        super(assetSubpath, turnsHead);
-    }
-
-    @Override
-    public ResourceLocation getTextureResource(Dinosaur animatable) {
-        return super.getTextureResource(animatable);
-    }
-
-    @Override
-    public void setCustomAnimations(Dinosaur animatable, long instanceId, AnimationState<Dinosaur> animationState) {
-        super.setCustomAnimations(animatable, instanceId, animationState);
-
-
     }
 }

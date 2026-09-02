@@ -4,7 +4,7 @@ import net.dumbcode.projectnublar.entity.dinosaur.Dinosaur;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import software.bernie.geckolib.core.animation.RawAnimation;
+import com.geckolib.animation.RawAnimation;
 
 import java.util.HashMap;
 import java.util.Random;
@@ -13,24 +13,25 @@ public class DinoAnimationUtils {
 
 
 
-    //ANIMATION-STATES
-    public static EntityDataAccessor<Boolean> IS_EATING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_DRINKING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_NESTING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_ROARING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_SPEAKING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_SITTING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_RESTING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_RISING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_ATTACKING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_FLINCHING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_DEAD_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_SWIMMING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> IS_RUNNING_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> LOOKING_LEFT_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> LOOKING_RIGHT_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> TURNING_LEFT_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
-    public static EntityDataAccessor<Boolean> TURNING_RIGHT_STATE = SynchedEntityData.defineId(Dinosaur.class, EntityDataSerializers.BOOLEAN);
+    // 26.2: accessors are declared on Dinosaur (foreign declarations are rejected); these
+    // aliases keep the existing DinoAnimationUtils.X call sites working
+    public static final EntityDataAccessor<Boolean> IS_EATING_STATE = Dinosaur.IS_EATING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_DRINKING_STATE = Dinosaur.IS_DRINKING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_NESTING_STATE = Dinosaur.IS_NESTING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_ROARING_STATE = Dinosaur.IS_ROARING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_SPEAKING_STATE = Dinosaur.IS_SPEAKING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_SITTING_STATE = Dinosaur.IS_SITTING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_RESTING_STATE = Dinosaur.IS_RESTING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_RISING_STATE = Dinosaur.IS_RISING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_ATTACKING_STATE = Dinosaur.IS_ATTACKING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_FLINCHING_STATE = Dinosaur.IS_FLINCHING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_DEAD_STATE = Dinosaur.IS_DEAD_STATE;
+    public static final EntityDataAccessor<Boolean> IS_SWIMMING_STATE = Dinosaur.IS_SWIMMING_STATE;
+    public static final EntityDataAccessor<Boolean> IS_RUNNING_STATE = Dinosaur.IS_RUNNING_STATE;
+    public static final EntityDataAccessor<Boolean> LOOKING_LEFT_STATE = Dinosaur.LOOKING_LEFT_STATE;
+    public static final EntityDataAccessor<Boolean> LOOKING_RIGHT_STATE = Dinosaur.LOOKING_RIGHT_STATE;
+    public static final EntityDataAccessor<Boolean> TURNING_LEFT_STATE = Dinosaur.TURNING_LEFT_STATE;
+    public static final EntityDataAccessor<Boolean> TURNING_RIGHT_STATE = Dinosaur.TURNING_RIGHT_STATE;
 
     public static HashMap<String,EntityDataAccessor<Boolean>> dinoAnims(){
         HashMap<String,EntityDataAccessor<Boolean>> animationMap = new HashMap<String,EntityDataAccessor<Boolean>>();

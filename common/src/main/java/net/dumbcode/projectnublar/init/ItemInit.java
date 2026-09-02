@@ -1,70 +1,68 @@
 package net.dumbcode.projectnublar.init;
 
-import dev.architectury.registry.registries.DeferredRegister;
-import dev.architectury.registry.registries.DeferredSupplier;
 import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.item.*;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.Item;
+import net.dumbcode.projectnublar.platform.DeferredItem;
+import net.dumbcode.projectnublar.platform.DeferredRegister;
 
 public class ItemInit {
-    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Constants.MODID, Registries.ITEM);
+    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(Constants.MODID);
 
-    public static final DeferredSupplier<Item> FOSSIL_ITEM = ITEMS.register("fossil", () -> new FossilItem(getItemProperties()));
-    public static final DeferredSupplier<Item> AMBER_ITEM = ITEMS.register("amber", () -> new AmberItem(getItemProperties()));
+    public static final DeferredItem<Item> FOSSIL_ITEM = ITEMS.registerItem("fossil", FossilItem::new);
+    public static final DeferredItem<Item> AMBER_ITEM = ITEMS.registerItem("amber", AmberItem::new);
 
-    public static final DeferredSupplier<Item> DEV_STICK = ITEMS.register("dev_stick", () -> new DebugStick(getItemProperties()));
+    public static final DeferredItem<Item> DEV_STICK = ITEMS.registerItem("dev_stick", DebugStick::new);
 
-    public static final DeferredSupplier<Item> TEST_TUBE_ITEM = ITEMS.register("test_tube", () -> new TestTubeItem(getItemProperties()));
+    public static final DeferredItem<Item> TEST_TUBE_ITEM = ITEMS.registerItem("test_tube", TestTubeItem::new);
 
-    public static final DeferredSupplier<Item> IRON_FILTER = ITEMS.register("iron_filter", () -> new FilterItem(getItemProperties().durability(100), 0.25));
-    public static final DeferredSupplier<Item> GOLD_FILTER = ITEMS.register("gold_filter", () -> new FilterItem(getItemProperties().durability(100),0.5));
-    public static final DeferredSupplier<Item> DIAMOND_FILTER = ITEMS.register("diamond_filter", () -> new FilterItem(getItemProperties().durability(100),1));
-    public static final DeferredSupplier<Item> DEV_FILTER = ITEMS.register("dev_filter", () -> new FilterItem(getItemProperties(),1));
+    public static final DeferredItem<Item> IRON_FILTER = ITEMS.registerItem("iron_filter", props -> new FilterItem(props.durability(100), 0.25));
+    public static final DeferredItem<Item> GOLD_FILTER = ITEMS.registerItem("gold_filter", props -> new FilterItem(props.durability(100),0.5));
+    public static final DeferredItem<Item> DIAMOND_FILTER = ITEMS.registerItem("diamond_filter", props -> new FilterItem(props.durability(100),1));
+    public static final DeferredItem<Item> DEV_FILTER = ITEMS.registerItem("dev_filter", props -> new FilterItem(props,1));
 
-    public static final DeferredSupplier<Item> IRON_TANK_UPGRADE = ITEMS.register("iron_tank_upgrade", () -> new TankItem(getItemProperties(), 3000, 2000, 24, 128));
-    public static final DeferredSupplier<Item> GOLD_TANK_UPGRADE = ITEMS.register("gold_tank_upgrade", () -> new TankItem(getItemProperties(), 4000, 3000, 32, 192));
-    public static final DeferredSupplier<Item> DIAMOND_TANK_UPGRADE = ITEMS.register("diamond_tank_upgrade", () -> new TankItem(getItemProperties(),8000, 4000, 40, -1));
+    public static final DeferredItem<Item> IRON_TANK_UPGRADE = ITEMS.registerItem("iron_tank_upgrade", props -> new TankItem(props, 3000, 2000, 24, 128));
+    public static final DeferredItem<Item> GOLD_TANK_UPGRADE = ITEMS.registerItem("gold_tank_upgrade", props -> new TankItem(props, 4000, 3000, 32, 192));
+    public static final DeferredItem<Item> DIAMOND_TANK_UPGRADE = ITEMS.registerItem("diamond_tank_upgrade", props -> new TankItem(props,8000, 4000, 40, -1));
 
-    public static final DeferredSupplier<Item> IRON_COMPUTER_CHIP = ITEMS.register("iron_computer_chip", () -> new ComputerChipItem(getItemProperties(), 3*20*60, 7 * 20 * 60, 8 * 20 * 60));
-    public static final DeferredSupplier<Item> GOLD_COMPUTER_CHIP = ITEMS.register("gold_computer_chip", () -> new ComputerChipItem(getItemProperties(),2*20*60, 4 * 60 * 20, 6 * 20 * 60));
-    public static final DeferredSupplier<Item> DIAMOND_COMPUTER_CHIP = ITEMS.register("diamond_computer_chip", () -> new ComputerChipItem(getItemProperties(),20*60, -1, 4 * 20 * 60));
-    public static final DeferredSupplier<Item> DEV_COMPUTER_CHIP = ITEMS.register("dev_computer_chip", () -> new ComputerChipItem(getItemProperties(),10, 10, 10));
+    public static final DeferredItem<Item> IRON_COMPUTER_CHIP = ITEMS.registerItem("iron_computer_chip", props -> new ComputerChipItem(props, 3*20*60, 7 * 20 * 60, 8 * 20 * 60));
+    public static final DeferredItem<Item> GOLD_COMPUTER_CHIP = ITEMS.registerItem("gold_computer_chip", props -> new ComputerChipItem(props,2*20*60, 4 * 60 * 20, 6 * 20 * 60));
+    public static final DeferredItem<Item> DIAMOND_COMPUTER_CHIP = ITEMS.registerItem("diamond_computer_chip", props -> new ComputerChipItem(props,20*60, -1, 4 * 20 * 60));
+    public static final DeferredItem<Item> DEV_COMPUTER_CHIP = ITEMS.registerItem("dev_computer_chip", props -> new ComputerChipItem(props,10, 10, 10));
 
-    public static final DeferredSupplier<Item> HARD_DRIVE = ITEMS.register("hard_drive", () -> new DiskStorageItem(getItemProperties(), 10*20));
-    public static final DeferredSupplier<Item> SSD = ITEMS.register("ssd", () -> new DiskStorageItem(getItemProperties(), 5*20));
-    public static final DeferredSupplier<Item> DEV_SSD = ITEMS.register("dev_ssd", () -> new DiskStorageItem(getItemProperties(), 10));
+    public static final DeferredItem<Item> HARD_DRIVE = ITEMS.registerItem("hard_drive", props -> new DiskStorageItem(props, 10*20));
+    public static final DeferredItem<Item> SSD = ITEMS.registerItem("ssd", props -> new DiskStorageItem(props, 5*20));
+    public static final DeferredItem<Item> DEV_SSD = ITEMS.registerItem("dev_ssd", props -> new DiskStorageItem(props, 10));
 
-    public static final DeferredSupplier<Item> SYRINGE = ITEMS.register("syringe", () -> new SyringeItem(getItemProperties()));
-    public static final DeferredSupplier<Item> SEQUENCER_DOOR = registerSingleItem("sequencer_door");
-    public static final DeferredSupplier<Item> SEQUENCER_SCREEN = registerSingleItem("sequencer_monitor");
-    public static final DeferredSupplier<Item> SEQUENCER_COMPUTER = registerSingleItem("sequencer_computer");
+    public static final DeferredItem<Item> SYRINGE = ITEMS.registerItem("syringe", SyringeItem::new);
+    public static final DeferredItem<Item> SEQUENCER_DOOR = registerSingleItem("sequencer_door");
+    public static final DeferredItem<Item> SEQUENCER_SCREEN = registerSingleItem("sequencer_monitor");
+    public static final DeferredItem<Item> SEQUENCER_COMPUTER = registerSingleItem("sequencer_computer");
 
-    public static final DeferredSupplier<Item> CRACKED_ARTIFICIAL_EGG = ITEMS.register("cracked_artificial_egg", () -> new Item(getItemProperties().stacksTo(1)));
-    public static final DeferredSupplier<Item> ARTIFICIAL_EGG = ITEMS.register("artificial_egg", () -> new Item(getItemProperties().stacksTo(1)));
-    public static final DeferredSupplier<Item> UNINCUBATED_EGG = ITEMS.register("unincubated_egg", () -> new UnincubatedEggItem(getItemProperties()));
-    public static final DeferredSupplier<Item> SMALL_CONTAINER_UPGRADE = ITEMS.register("small_container_upgrade", () -> new Item(getItemProperties()));
-    public static final DeferredSupplier<Item> LARGE_CONTAINER_UPGRADE = ITEMS.register("large_container_upgrade", () -> new Item(getItemProperties()));
-    public static final DeferredSupplier<Item> WARM_BULB = ITEMS.register("warm_bulb", () -> new BulbItem(getItemProperties(), 15*20));
-    public static final DeferredSupplier<Item> WARMER_BULB = ITEMS.register("warmer_bulb", () -> new BulbItem(getItemProperties(), 12*20));
-    public static final DeferredSupplier<Item> HOT_BULB = ITEMS.register("hot_bulb", () -> new BulbItem(getItemProperties(),9*20));
-    public static final DeferredSupplier<Item> DEV_BULB = ITEMS.register("dev_bulb", () -> new BulbItem(getItemProperties(),2));
-    public static final DeferredSupplier<Item> IRON_PLANT_TANK = ITEMS.register("iron_plant_tank_ugprade", () -> new PlantTankItem(getItemProperties(),128));
-    public static final DeferredSupplier<Item> GOLD_PLANT_TANK = ITEMS.register("gold_plant_tank_upgrade", () -> new PlantTankItem(getItemProperties(), 192));
-    public static final DeferredSupplier<Item> INCUBATOR_NEST = ITEMS.register("incubator_nest", () -> new Item(getItemProperties()));
-    public static final DeferredSupplier<Item> INCUBATOR_LID = ITEMS.register("incubator_lid", () -> new Item(getItemProperties()));
-    public static final DeferredSupplier<Item> INCUBATOR_ARM_BASE = ITEMS.register("incubator_arm_base", () -> new Item(getItemProperties()));
-    public static final DeferredSupplier<Item> INCUBATOR_ARM = ITEMS.register("incubator_arm", () -> new Item(getItemProperties()));
-    public static final DeferredSupplier<Item> INCUBATED_EGG = ITEMS.register("incubated_egg", () -> new IncubatedEggItem(getItemProperties()));
-    public static final DeferredSupplier<Item> LEVELING_SENSOR = ITEMS.register("leveling_sensor", () -> new Item(getItemProperties()));
-    public static final DeferredSupplier<Item> WIRE_SPOOL = ITEMS.register("wire_spool", () -> new Item(getItemProperties()));
-    public static DeferredSupplier<Item> registerSingleItem(String name) {
-        return ITEMS.register(name, () -> new Item(getItemProperties().stacksTo(1)));
-    }
-    public static Item.Properties getItemProperties() {
-        return new Item.Properties();
+    public static final DeferredItem<Item> CRACKED_ARTIFICIAL_EGG = ITEMS.registerItem("cracked_artificial_egg", props -> new Item(props.stacksTo(1)));
+    public static final DeferredItem<Item> ARTIFICIAL_EGG = ITEMS.registerItem("artificial_egg", props -> new Item(props.stacksTo(1)));
+    public static final DeferredItem<Item> UNINCUBATED_EGG = ITEMS.registerItem("unincubated_egg", UnincubatedEggItem::new);
+    public static final DeferredItem<Item> SMALL_CONTAINER_UPGRADE = ITEMS.registerItem("small_container_upgrade", Item::new);
+    public static final DeferredItem<Item> LARGE_CONTAINER_UPGRADE = ITEMS.registerItem("large_container_upgrade", Item::new);
+    public static final DeferredItem<Item> WARM_BULB = ITEMS.registerItem("warm_bulb", props -> new BulbItem(props, 15*20));
+    public static final DeferredItem<Item> WARMER_BULB = ITEMS.registerItem("warmer_bulb", props -> new BulbItem(props, 12*20));
+    public static final DeferredItem<Item> HOT_BULB = ITEMS.registerItem("hot_bulb", props -> new BulbItem(props,9*20));
+    public static final DeferredItem<Item> DEV_BULB = ITEMS.registerItem("dev_bulb", props -> new BulbItem(props,2));
+    public static final DeferredItem<Item> IRON_PLANT_TANK = ITEMS.registerItem("iron_plant_tank_ugprade", props -> new PlantTankItem(props,128));
+    public static final DeferredItem<Item> GOLD_PLANT_TANK = ITEMS.registerItem("gold_plant_tank_upgrade", props -> new PlantTankItem(props, 192));
+    public static final DeferredItem<Item> INCUBATOR_NEST = ITEMS.registerItem("incubator_nest", Item::new);
+    public static final DeferredItem<Item> INCUBATOR_LID = ITEMS.registerItem("incubator_lid", Item::new);
+    public static final DeferredItem<Item> INCUBATOR_ARM_BASE = ITEMS.registerItem("incubator_arm_base", Item::new);
+    public static final DeferredItem<Item> INCUBATOR_ARM = ITEMS.registerItem("incubator_arm", Item::new);
+    public static final DeferredItem<Item> INCUBATED_EGG = ITEMS.registerItem("incubated_egg", IncubatedEggItem::new);
+    public static final DeferredItem<Item> LEVELING_SENSOR = ITEMS.registerItem("leveling_sensor", Item::new);
+    public static final DeferredItem<Item> WIRE_SPOOL = ITEMS.registerItem("wire_spool", Item::new);
+
+    public static DeferredItem<Item> registerSingleItem(String name) {
+        return ITEMS.registerItem(name, props -> new Item(props.stacksTo(1)));
     }
 
-    public static void loadClass() {ITEMS.register();
+    public static void registerTo() {
+        ITEMS.register();
     }
 }

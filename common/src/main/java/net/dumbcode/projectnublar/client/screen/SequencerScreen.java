@@ -1,7 +1,6 @@
 package net.dumbcode.projectnublar.client.screen;
 
 import com.mojang.datafixers.util.Pair;
-import com.mojang.math.Axis;
 import net.dumbcode.projectnublar.ProjectNublar;
 import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.api.DNAData;
@@ -12,45 +11,49 @@ import net.dumbcode.projectnublar.block.entity.SequencerBlockEntity;
 import net.dumbcode.projectnublar.client.widget.*;
 import net.dumbcode.projectnublar.container.ToggleSlot;
 import net.dumbcode.projectnublar.entity.dinosaur.Dinosaur;
+import net.dumbcode.projectnublar.init.DataComponentInit;
 import net.dumbcode.projectnublar.init.GeneInit;
 import net.dumbcode.projectnublar.item.DiskStorageItem;
 import net.dumbcode.projectnublar.menutypes.SequencerMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.StringUtil;
+import org.joml.Quaternionf;
+import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import org.joml.Quaternionf;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
-    private static ResourceLocation TEXTURE = Constants.modLoc("textures/gui/sequencer.png");
-    private static ResourceLocation TEXTURE_2 = Constants.modLoc("textures/gui/sequencer_page.png");
-    private static ResourceLocation INVENTORY = Constants.modLoc("textures/gui/inventory_overlay.png");
-    private static ResourceLocation CENTER = Constants.modLoc("textures/gui/center_pieces.png");
-    private static ResourceLocation SPIRAL = Constants.modLoc("textures/gui/dna_spiral.png");
-    private static ResourceLocation SYNTH = Constants.modLoc("textures/gui/synth_page.png");
-    private static ResourceLocation EDIT = Constants.modLoc("textures/gui/edit_page.png");
+    private static Identifier TEXTURE = Constants.modLoc("textures/gui/sequencer.png");
+    private static Identifier TEXTURE_2 = Constants.modLoc("textures/gui/sequencer_page.png");
+    private static Identifier INVENTORY = Constants.modLoc("textures/gui/inventory_overlay.png");
+    private static Identifier CENTER = Constants.modLoc("textures/gui/center_pieces.png");
+    private static Identifier SPIRAL = Constants.modLoc("textures/gui/dna_spiral.png");
+    private static Identifier SYNTH = Constants.modLoc("textures/gui/synth_page.png");
+    private static Identifier EDIT = Constants.modLoc("textures/gui/edit_page.png");
     ProgressWidget progressWidget;
     TextScrollBox textScrollBox;
     TextScrollBox isolatedTextScrollBox;
@@ -75,11 +78,9 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
     public GeneHolder slider;
 
     public SequencerScreen(SequencerMenu processorMenu, Inventory inventory, Component component) {
-        super(processorMenu, inventory, component);
+        super(processorMenu, inventory, component, 351, 199);
         inventoryLabelY = -8200;
         titleLabelY = -8200;
-        imageHeight = 199;
-        imageWidth = 351;
         dinoData = ((SequencerBlockEntity) Minecraft.getInstance().level.getBlockEntity(processorMenu.getPos())).getDinoData();
         RandomSource random = RandomSource.create();
         for (int i = 0; i < this.ringModifiers.length; i++) {
@@ -115,23 +116,23 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
             return (getMenu().getDataSlot(0)) / (float) getMenu().getDataSlot(1);
         }, true, false) {
             @Override
-            public boolean mouseClicked(double $$0, double $$1, int $$2) {
+            public boolean mouseClicked(MouseButtonEvent $$0, boolean $$1) {
                 return false;
             }
         };
         this.addWidget(progressWidget);
         listWidget = new ScrollingButtonListWidget<>(this, leftPos + 36, topPos + 42, 150, 102, Component.empty()) {
             @Override
-            protected void renderBackground(GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
-                SequencerScreen.drawBorder(pGuiGraphics, getX(), getY(), this.width, this.height, Constants.BORDER_COLOR, 1);
-                pGuiGraphics.fill(getX() + 1, getY() + 1, getX() + this.width - 1, getY() + this.height - 1, 0xCF0F2234);
+            protected void renderBackground(GuiGraphicsExtractor pGuiGraphicsExtractor, int pMouseX, int pMouseY, float pPartialTick) {
+                SequencerScreen.drawBorder(pGuiGraphicsExtractor, getX(), getY(), this.width, this.height, Constants.BORDER_COLOR, 1);
+                pGuiGraphicsExtractor.fill(getX() + 1, getY() + 1, getX() + this.width - 1, getY() + this.height - 1, 0xCF0F2234);
             }
         };
         isolatedWidget = new ScrollingButtonListWidget<>(this, leftPos + 36, topPos + 42, 150, 102, Component.empty()) {
             @Override
-            protected void renderBackground(GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
-                SequencerScreen.drawBorder(pGuiGraphics, getX(), getY(), this.width, this.height, Constants.BORDER_COLOR, 1);
-                pGuiGraphics.fill(getX() + 1, getY() + 1, getX() + this.width - 1, getY() + this.height - 1, 0xCF0F2234);
+            protected void renderBackground(GuiGraphicsExtractor pGuiGraphicsExtractor, int pMouseX, int pMouseY, float pPartialTick) {
+                SequencerScreen.drawBorder(pGuiGraphicsExtractor, getX(), getY(), this.width, this.height, Constants.BORDER_COLOR, 1);
+                pGuiGraphicsExtractor.fill(getX() + 1, getY() + 1, getX() + this.width - 1, getY() + this.height - 1, 0xCF0F2234);
             }
         };
         this.addWidget(listWidget);
@@ -151,16 +152,15 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
         dnaSliderMain.setConsumer((slider, selected) -> {
             if (selected) {
                 entityList.clearButtons();
-                if (menu.storageSlot.getItem().hasTag()) {
-                    menu.storageSlot.getItem().getTag().getAllKeys().forEach(
-                            key -> {
-                                DNAData dnaData = DNAData.loadFromNBT(menu.storageSlot.getItem().getTag().getCompound(key));
+                Map<String, DNAData> storedDna = menu.storageSlot.getItem().getOrDefault(DataComponentInit.DISK_DNA.get(), Map.of());
+                if (!storedDna.isEmpty()) {
+                    storedDna.values().forEach(dnaData -> {
                                 if (BuiltInRegistries.ENTITY_TYPE.getKey(dnaData.getEntityType()).getNamespace().equals(Constants.MODID)) {
                                     EntityWidget entityWidget = new EntityWidget(leftPos + 233, topPos + 25, 107, 20, dnaData, (button, selected2) -> {
                                         slider.setEntityType(dnaData.getEntityType());
                                         slider.setDNAData(dnaData);
                                         dinoData.setBaseDino(dnaData.getEntityType());
-                                        sequencingDino = (LivingEntity) dnaData.getEntityType().create(Minecraft.getInstance().level);
+                                        sequencingDino = (LivingEntity) dnaData.getEntityType().create(Minecraft.getInstance().level, EntitySpawnReason.LOAD);
                                         entityList.children().forEach(child -> {
                                             EntityWidget entityWidget1 = (EntityWidget) child;
                                             if (button != entityWidget1) {
@@ -195,10 +195,9 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
         DNASlider.OnClick onClick = (slider, selected) -> {
             if (selected) {
                 entityList.clearButtons();
-                if (menu.storageSlot.getItem().hasTag()) {
-                    menu.storageSlot.getItem().getTag().getAllKeys().forEach(
-                            key -> {
-                                DNAData dnaData = DNAData.loadFromNBT(menu.storageSlot.getItem().getTag().getCompound(key));
+                Map<String, DNAData> storedDna = menu.storageSlot.getItem().getOrDefault(DataComponentInit.DISK_DNA.get(), Map.of());
+                if (!storedDna.isEmpty()) {
+                    storedDna.values().forEach(dnaData -> {
                                 if (!BuiltInRegistries.ENTITY_TYPE.getKey(dnaData.getEntityType()).getNamespace().equals(Constants.MODID)) {
                                     EntityWidget entityWidget = new EntityWidget(leftPos + 233, topPos + 25, 107, 20, dnaData, (button, selected2) -> {
                                         slider.setEntityType(dnaData.getEntityType());
@@ -293,7 +292,7 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
             return ((SequencerBlockEntity) Minecraft.getInstance().level.getBlockEntity(menu.getPos())).isSynthesizing();
         });
         int index = 0;
-        int geneSize = GeneInit.GENES.getRegistrar().getIds().size();
+        int geneSize = GeneInit.GENES.getEntries().size();
         geneButtons.clear();
         List<Genes.Gene> geneList = GeneInit.getList();
         for (int ya = 0; ya < 20; ya++) {
@@ -332,15 +331,17 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
     }
 
     @Override
-    public boolean mouseDragged(double pMouseX, double pMouseY, int pButton, double pDragX, double pDragY) {
-        if (this.getFocused() != null && this.isDragging() && pButton == 0 && this.getFocused().mouseDragged(pMouseX, pMouseY, pButton, pDragX, pDragY)) {
+    public boolean mouseDragged(MouseButtonEvent pEvent, double pDragX, double pDragY) {
+        if (this.getFocused() != null && this.isDragging() && this.getFocused().mouseDragged(pEvent, pDragX, pDragY)) {
             return true;
         }
-        return super.mouseDragged(pMouseX, pMouseY, pButton, pDragX, pDragY);
+        return super.mouseDragged(pEvent, pDragX, pDragY);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int buttonCode) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
         if (showInventory()) {
             if (mouseX < leftPos + 87 || mouseX > leftPos + imageWidth - 87 || mouseY < topPos + 31 || mouseY > topPos + imageHeight - 31) {
                 this.menu.inventorySlots.forEach(slot -> slot.setActive(false));
@@ -363,7 +364,7 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
                 if (currentTab == 2) {
                     enableSynthScreen();
                 }
-                return super.mouseClicked(mouseX, mouseY, buttonCode);
+                return super.mouseClicked(event, doubleClick);
             }
         }
         if (currentTab == 0) {
@@ -428,7 +429,7 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
 //        menu.waterInputSlot.setActive(false);
 //        menu.sugarInputSlot.setActive(false);
 //        menu.plantMatterInputSlot.setActive(false);
-        return super.mouseClicked(mouseX, mouseY, buttonCode);
+        return super.mouseClicked(event, doubleClick);
     }
 
     private void enableAdvanced() {
@@ -460,7 +461,7 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
     }
 
     @Override
-    protected void slotClicked(Slot pSlot, int pSlotId, int pMouseButton, ClickType pType) {
+    protected void slotClicked(Slot pSlot, int pSlotId, int pMouseButton, ContainerInput pInput) {
         if (pSlot == getMenu().storageDisplaySlot) {
             getMenu().storageSlot.toggleActive();
             getMenu().dnaInputSlot.setActive(false);
@@ -536,7 +537,7 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
             this.children().forEach(child -> ((AbstractWidget) child).active = !getMenu().dnaTestTubeOutputSlot.isActive());
         }
 
-        super.slotClicked(pSlot, pSlotId, pMouseButton, pType);
+        super.slotClicked(pSlot, pSlotId, pMouseButton, pInput);
     }
 
     public void disableSequenceScreen() {
@@ -613,27 +614,27 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
     }
 
     @Override
-    protected void renderBg(GuiGraphics guiGraphics, float partialTicks, int mouseX, int mouseY) {
+    public void extractBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         guiGraphics.fillGradient(0, 0, this.width, this.height, -1072689136, -804253680);
         x = this.leftPos;
-        y = (this.height - this.imageHeight) / 2;
-        guiGraphics.blit(TEXTURE, x, y, 0, 0, imageWidth, imageHeight, 351, 398);
+        y = this.topPos;
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, x, y, 0, 0, imageWidth, imageHeight, 351, 398);
         int ringStartX = (this.imageWidth - RING_SIZE) / 2;
         int ringStartY = (this.imageHeight - RING_SIZE) / 2;
         for (int ring = 0; ring < 5; ring++) {
             int u = (ring % 3) * RING_SIZE;
             int v = (ring / 3) * RING_SIZE;
 
-            guiGraphics.pose().pushPose();
-            guiGraphics.pose().translate(this.leftPos, this.topPos, 0);
-            guiGraphics.pose().translate(this.imageWidth / 2F, this.imageHeight / 2F, 0);
-            guiGraphics.pose().mulPose(Axis.ZP.rotationDegrees((minecraft.player.tickCount + minecraft.getFrameTime()) * (ring % 2 == 0 ? 1 : -1) * this.ringModifiers[ring] + 0.5F));
-            guiGraphics.pose().translate(-this.imageWidth / 2F, -this.imageHeight / 2F, 0);
-            guiGraphics.blit(CENTER, ringStartX, ringStartY, u, v, RING_SIZE, RING_SIZE, 525, 350);
-            guiGraphics.pose().popPose();
+            guiGraphics.pose().pushMatrix();
+            guiGraphics.pose().translate(this.leftPos, this.topPos);
+            guiGraphics.pose().translate(this.imageWidth / 2F, this.imageHeight / 2F);
+            guiGraphics.pose().rotate((float) Math.toRadians((minecraft.player.tickCount + partialTicks) * (ring % 2 == 0 ? 1 : -1) * this.ringModifiers[ring] + 0.5F));
+            guiGraphics.pose().translate(-this.imageWidth / 2F, -this.imageHeight / 2F);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, CENTER, ringStartX, ringStartY, u, v, RING_SIZE, RING_SIZE, 525, 350);
+            guiGraphics.pose().popMatrix();
         }
-        guiGraphics.blit(CENTER, this.leftPos + (this.imageWidth - 63) / 2, this.topPos + (this.imageHeight - 63) / 2, RING_SIZE * 2, RING_SIZE, 63, 63, 525, 350);
-        guiGraphics.blit(TEXTURE, x, y, 0, imageHeight, imageWidth, imageHeight, 351, 398);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, CENTER, this.leftPos + (this.imageWidth - 63) / 2, this.topPos + (this.imageHeight - 63) / 2, RING_SIZE * 2, RING_SIZE, 63, 63, 525, 350);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, x, y, 0, imageHeight, imageWidth, imageHeight, 351, 398);
         switch (currentTab) {
             case 0:
                 renderSequenceScreen(guiGraphics, partialTicks, mouseX, mouseY);
@@ -653,72 +654,71 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
 
     }
 
-    public void renderSequenceScreen(GuiGraphics guiGraphics, float partialTicks, int mouseX, int mouseY) {
+    public void renderSequenceScreen(GuiGraphicsExtractor guiGraphics, float partialTicks, int mouseX, int mouseY) {
         Component text = Component.translatable("button." + Constants.MODID + ".regular");
         int textWidth = this.font.width(text);
-        guiGraphics.drawString(this.font, Component.translatable("button." + Constants.MODID + ".regular"), this.leftPos + 174 - textWidth, this.topPos + 22, 0xFFFFFFFF);
-        guiGraphics.drawString(this.font, Component.translatable("button." + Constants.MODID + ".isolated"), this.leftPos + 180, this.topPos + 22, 0xFFFFFFFF);
+        guiGraphics.text(this.font, Component.translatable("button." + Constants.MODID + ".regular"), this.leftPos + 174 - textWidth, this.topPos + 22, 0xFFFFFFFF);
+        guiGraphics.text(this.font, Component.translatable("button." + Constants.MODID + ".isolated"), this.leftPos + 180, this.topPos + 22, 0xFFFFFFFF);
 
-        guiGraphics.blit(TEXTURE_2, x, y, 0, 0, imageWidth, imageHeight, 472, 199);
-        progressWidget.render(guiGraphics, mouseX, mouseY, partialTicks);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE_2, x, y, 0, 0, imageWidth, imageHeight, 472, 199);
+        progressWidget.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
         if (showInventory()) {
             guiGraphics.enableScissor(this.leftPos, this.topPos, this.leftPos + 87, this.topPos + height);
         }
-        listWidget.render(guiGraphics, mouseX, mouseY, partialTicks);
-        isolatedWidget.render(guiGraphics, mouseX, mouseY, partialTicks);
+        listWidget.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
+        isolatedWidget.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
         if (showInventory()) {
             guiGraphics.disableScissor();
             guiGraphics.enableScissor(this.leftPos + 261, this.topPos, this.leftPos + width, this.topPos + height);
         }
-        textScrollBox.render(guiGraphics, mouseX, mouseY, partialTicks);
-        isolatedTextScrollBox.render(guiGraphics, mouseX, mouseY, partialTicks);
+        textScrollBox.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
+        isolatedTextScrollBox.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
         if (selectedDino != null) {
-            InventoryScreen.renderEntityInInventory(guiGraphics, this.leftPos + 270, this.topPos + 68, 10, new Quaternionf().rotateZ((float) Math.PI).rotateY(minecraft.level.getGameTime() * 5f * (float) (Math.PI / 180f)), null, selectedDino);
+            GuiHelper.renderEntityInInventory(guiGraphics, this.leftPos + 270, this.topPos + 68, 10, new Quaternionf().rotateZ((float) Math.PI).rotateY(minecraft.level.getGameTime() * 5f * (float) (Math.PI / 180f)), selectedDino);
         }
         if (showInventory()) {
             guiGraphics.disableScissor();
             guiGraphics.fillGradient(0, 0, this.width, this.height, -1072689136, -804253680);
-            guiGraphics.blit(INVENTORY, x, y, 0, 0, imageWidth, imageHeight, 351, 199);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, INVENTORY, x, y, 0, 0, imageWidth, imageHeight, 351, 199);
         }
     }
 
-    public void renderEditScreen(GuiGraphics guiGraphics, float partialTicks, int mouseX, int mouseY) {
+    public void renderEditScreen(GuiGraphicsExtractor guiGraphics, float partialTicks, int mouseX, int mouseY) {
         drawBorder(guiGraphics, leftPos + 105, topPos + 24, 222 - 106 + 2, 101, Constants.BORDER_COLOR, 1);
         guiGraphics.fill(leftPos + 106, topPos + 25, leftPos + 222, topPos + 123, 0xCF193B59);
         if (sequencingDino != null) {
             guiGraphics.enableScissor(leftPos + 105, topPos + 25, leftPos + 222, topPos + 123);
             ((Dinosaur) sequencingDino).setDinoData(dinoData);
-            InventoryScreen.renderEntityInInventory(guiGraphics, leftPos + 105 + 55, topPos + 25 + 90, 18, new Quaternionf().rotateZ((float) Math.PI).rotateY(90), null, sequencingDino);
-            guiGraphics.pose().pushPose();
-            guiGraphics.pose().translate(0, 0, 10);
-            InventoryScreen.renderEntityInInventory(guiGraphics, leftPos + 105 + 70 + 5, topPos + 25 + 90 + 2, 18, new Quaternionf().rotateZ((float) Math.PI).rotateY(135), null, Minecraft.getInstance().player);
-            guiGraphics.pose().popPose();
+            GuiHelper.renderEntityInInventory(guiGraphics, leftPos + 105 + 55, topPos + 25 + 90, 18, new Quaternionf().rotateZ((float) Math.PI).rotateY(90), sequencingDino);
+            guiGraphics.pose().pushMatrix();
+            GuiHelper.renderEntityInInventory(guiGraphics, leftPos + 105 + 70 + 5, topPos + 25 + 90 + 2, 18, new Quaternionf().rotateZ((float) Math.PI).rotateY(135), Minecraft.getInstance().player);
+            guiGraphics.pose().popMatrix();
             guiGraphics.disableScissor();
         }
         guiGraphics.fill(leftPos + 106, topPos + 136, leftPos + 339, topPos + 176, 0xCF0F2234);
         drawBorder(guiGraphics, leftPos + 105, topPos + 135, 339 - 106 + 2, 42, Constants.BORDER_COLOR, 1);
-        guiGraphics.blit(EDIT, leftPos, topPos, 0, 0, 351, 199, 351, 199);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, EDIT, leftPos, topPos, 0, 0, 351, 199, 351, 199);
     }
 
-    public void renderBasicEditScreen(GuiGraphics guiGraphics, float partialTicks, int mouseX, int mouseY) {
+    public void renderBasicEditScreen(GuiGraphicsExtractor guiGraphics, float partialTicks, int mouseX, int mouseY) {
         drawBorder(guiGraphics, leftPos + 232, topPos + 24, 109, 100, Constants.BORDER_COLOR, 1);
         guiGraphics.fill(leftPos + 233, topPos + 25, leftPos + 340, topPos + 123, 0xCF0F2234);
-        dNASliders.forEach(dnaSlider -> dnaSlider.render(guiGraphics, mouseX, mouseY, partialTicks));
-        entityList.render(guiGraphics, mouseX, mouseY, partialTicks);
-        guiGraphics.drawCenteredString(this.font, Component.literal("Advanced"), leftPos + 49, topPos + 10, 0xFFFFFFFF);
+        dNASliders.forEach(dnaSlider -> dnaSlider.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks));
+        entityList.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
+        guiGraphics.centeredText(this.font, Component.literal("Advanced"), leftPos + 49, topPos + 10, 0xFFFFFFFF);
     }
 
-    public void renderSynthScreen(GuiGraphics guiGraphics, float partialTicks, int mouseX, int mouseY) {
-        guiGraphics.blit(SYNTH, x, y, 0, 0, imageWidth, imageHeight, 479, 199);
-        guiGraphics.drawCenteredString(this.font, Component.literal("Water"), leftPos + 58, topPos + 58, 16777215);
-        guiGraphics.drawCenteredString(this.font, Component.literal("Bone Matter"), leftPos + 58 + 236, topPos + 58, 16777215);
-        guiGraphics.drawCenteredString(this.font, Component.literal("Plant Matter"), leftPos + 58 + 236, topPos + 58 + 70, 16777215);
-        guiGraphics.drawCenteredString(this.font, Component.literal("Sugar"), leftPos + 58, topPos + 58 + 70, 16777215);
+    public void renderSynthScreen(GuiGraphicsExtractor guiGraphics, float partialTicks, int mouseX, int mouseY) {
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, SYNTH, x, y, 0, 0, imageWidth, imageHeight, 479, 199);
+        guiGraphics.centeredText(this.font, Component.literal("Water"), leftPos + 58, topPos + 58, 16777215);
+        guiGraphics.centeredText(this.font, Component.literal("Bone Matter"), leftPos + 58 + 236, topPos + 58, 16777215);
+        guiGraphics.centeredText(this.font, Component.literal("Plant Matter"), leftPos + 58 + 236, topPos + 58 + 70, 16777215);
+        guiGraphics.centeredText(this.font, Component.literal("Sugar"), leftPos + 58, topPos + 58 + 70, 16777215);
         float percent = getMenu().getDataSlot(6) / (float) getMenu().getDataSlot(9);
         int yOffset = Mth.floor(128 - (128 * percent));
-        guiGraphics.blit(SYNTH, x + (imageWidth / 2) - 64, y + (imageHeight / 2) - 63 + yOffset, 351, yOffset, 128, Mth.floor(128 * percent), 479, 199);
-        guiGraphics.blit(SYNTH, x + 159, y + 171, 351, 136, Mth.floor(33 * percent), 11, 479, 199);
-        beginButton.render(guiGraphics, mouseX, mouseY, partialTicks);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, SYNTH, x + (imageWidth / 2) - 64, y + (imageHeight / 2) - 63 + yOffset, 351, yOffset, 128, Mth.floor(128 * percent), 479, 199);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, SYNTH, x + 159, y + 171, 351, 136, Mth.floor(33 * percent), 11, 479, 199);
+        beginButton.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
         this.renderSynthIngredientBar(guiGraphics, leftPos + 9, topPos + 68, menu.getDataSlot(2) / (float) menu.getDataSlot(8));
         this.renderSynthIngredientBar(guiGraphics, leftPos + 9, topPos + 68 + 70, menu.getDataSlot(4) / (float) menu.getDataSlot(7));
         this.renderSynthIngredientBar(guiGraphics, leftPos + 9 + 236, topPos + 68, menu.getDataSlot(3) / (float) menu.getDataSlot(7));
@@ -729,16 +729,16 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
         if (showInventory()) {
             guiGraphics.disableScissor();
             guiGraphics.fillGradient(0, 0, this.width, this.height, -1072689136, -804253680);
-            guiGraphics.blit(INVENTORY, x, y, 0, 0, imageWidth, imageHeight, imageWidth, 199);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, INVENTORY, x, y, 0, 0, imageWidth, imageHeight, imageWidth, 199);
         }
     }
 
-    public void renderAdvancedEditScreen(GuiGraphics guiGraphics, float partialTicks, int mouseX, int mouseY) {
-        geneButtons.forEach(geneButton -> geneButton.render(guiGraphics, mouseX, mouseY, partialTicks));
-        guiGraphics.drawCenteredString(this.font, Component.literal("Basic"), leftPos + 49, topPos + 10, 0xFFFFFFFF);
+    public void renderAdvancedEditScreen(GuiGraphicsExtractor guiGraphics, float partialTicks, int mouseX, int mouseY) {
+        geneButtons.forEach(geneButton -> geneButton.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks));
+        guiGraphics.centeredText(this.font, Component.literal("Basic"), leftPos + 49, topPos + 10, 0xFFFFFFFF);
         if (selectedGene != null) {
-            guiGraphics.drawCenteredString(this.font, selectedGene.getTooltip(), leftPos + 285, topPos + 25, 0xFFFFFFFF);
-            ((AbstractWidget) slider).render(guiGraphics, mouseX, mouseY, partialTicks);
+            guiGraphics.centeredText(this.font, selectedGene.getTooltip(), leftPos + 285, topPos + 25, 0xFFFFFFFF);
+            ((AbstractWidget) slider).extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
         }
     }
 
@@ -755,36 +755,39 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
 
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
-        guiGraphics.drawCenteredString(this.font, Component.translatable("gui_tab." + Constants.MODID + ".sequence"), leftPos + 131, topPos + 5, 16777215);
-        guiGraphics.drawCenteredString(this.font, Component.translatable("gui_tab." + Constants.MODID + ".edit"), leftPos + 215, topPos + 5, 16777215);
-        guiGraphics.drawCenteredString(this.font, Component.translatable("gui_tab." + Constants.MODID + ".synthesis"), leftPos + 304, topPos + 5, 16777215);
-        progressWidget.setTooltip(Tooltip.create((Component.literal(StringUtil.formatTickDuration(Mth.floor(getMenu().getDataSlot(1) - (progressWidget.progress.get() * getMenu().getDataSlot(1))))))));
-        this.renderTooltip(guiGraphics, mouseX, mouseY);
+        super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
+        guiGraphics.centeredText(this.font, Component.translatable("gui_tab." + Constants.MODID + ".sequence"), leftPos + 131, topPos + 5, 16777215);
+        guiGraphics.centeredText(this.font, Component.translatable("gui_tab." + Constants.MODID + ".edit"), leftPos + 215, topPos + 5, 16777215);
+        guiGraphics.centeredText(this.font, Component.translatable("gui_tab." + Constants.MODID + ".synthesis"), leftPos + 304, topPos + 5, 16777215);
+        progressWidget.setTooltip(Tooltip.create(Component.literal(StringUtil.formatTickDuration(Mth.floor(getMenu().getDataSlot(1) - (progressWidget.progress.get() * getMenu().getDataSlot(1))), 20F))));
     }
 
-    public static void drawBorder(GuiGraphics guiGraphics, int x, int y, int width, int height, int color, int thickness) {
+    public static void drawBorder(GuiGraphicsExtractor guiGraphics, int x, int y, int width, int height, int color, int thickness) {
         guiGraphics.fill(x, y, x + width, y + thickness, color);
         guiGraphics.fill(x, y, x + thickness, y + height, color);
         guiGraphics.fill(x + width - thickness, y, x + width, y + height, color);
         guiGraphics.fill(x, y + height - thickness, x + width, y + height, color);
     }
 
-    public static void fill(GuiGraphics guiGraphics, int x, int y, int width, int height, int color) {
+    public static void fill(GuiGraphicsExtractor guiGraphics, int x, int y, int width, int height, int color) {
         guiGraphics.fill(x, y, x + width, y + height, color);
     }
 
     @Override
     protected void containerTick() {
-        if (getMenu().storageSlot.getItem().hasTag()) {
-            if (getMenu().storageSlot.getItem().getTag().getAllKeys().size() != listWidget.size()) {
+        Map<String, DNAData> storedDna = getMenu().storageSlot.getItem().getOrDefault(DataComponentInit.DISK_DNA.get(), Map.of());
+        if (!storedDna.isEmpty()) {
+            if (storedDna.size() != listWidget.size()) {
                 listWidget.clearButtons();
-                getMenu().storageSlot.getItem().getTag().getAllKeys().forEach(key -> {
+                storedDna.forEach((key, dnaData) -> {
                     listWidget.addButton(new SequenceDataDisplayWidget(0, 0, 120, 14, () -> getMenu().storageSlot.getItem(), key, (button, selected) -> {
                         if (selected) {
-                            DNAData data = DNAData.loadFromNBT(getMenu().storageSlot.getItem().getTag().getCompound(button.getValue()));
+                            DNAData data = storedDna.get(button.getValue());
+                            if (data == null) {
+                                return;
+                            }
                             textScrollBox.setText(List.of(
                                             data.getFormattedType().withStyle(ChatFormatting.GOLD),
                                             Component.literal("Time Period").withStyle(ChatFormatting.UNDERLINE),
@@ -793,7 +796,7 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
                                             Component.literal("Apple")
                                     )
                             );
-                            selectedDino = (LivingEntity) DNAData.loadFromNBT(getMenu().storageSlot.getItem().getTag().getCompound(button.getValue())).getEntityType().create(Minecraft.getInstance().level);
+                            selectedDino = (LivingEntity) data.getEntityType().create(Minecraft.getInstance().level, EntitySpawnReason.LOAD);
                             listWidget.getButtons().forEach(b -> {
                                 if (b != button) {
                                     ((SequenceDataDisplayWidget) b).selected = false;
@@ -852,14 +855,14 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
 
     public void buildGeneIsolationMap() {
         isolatedWidget.clearButtons();
-        if (!getMenu().storageSlot.getItem().hasTag()) {
+        Map<String, DNAData> storedDna = getMenu().storageSlot.getItem().getOrDefault(DataComponentInit.DISK_DNA.get(), Map.of());
+        if (storedDna.isEmpty()) {
             return;
         }
-        GeneInit.GENES.getRegistrar().forEach(gene -> {
+        for (Genes.Gene gene : GeneInit.getList()) {
             double totalPercent = 0;
             String geneInfo = ProjectNublar.checkReplace(gene.name()) + " ";
-            for (String key : getMenu().storageSlot.getItem().getTag().getAllKeys()) {
-                DNAData data = DNAData.loadFromNBT(getMenu().storageSlot.getItem().getTag().getCompound(key));
+            for (DNAData data : storedDna.values()) {
                 if (Genes.GENE_STORAGE.get(gene).stream().map(Pair::getFirst).toList().contains(data.getEntityType())) {
                     totalPercent += data.getDnaPercentage();
                 }
@@ -870,8 +873,7 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
                     if (selected) {
                         List<Component> dinoDnas = new ArrayList<>();
                         List<EntityType<?>> entities = new ArrayList<>(Genes.GENE_STORAGE.get(gene).stream().map(Pair::getFirst).toList());
-                        for (String key : getMenu().storageSlot.getItem().getTag().getAllKeys()) {
-                            DNAData data = DNAData.loadFromNBT(getMenu().storageSlot.getItem().getTag().getCompound(key));
+                        for (DNAData data : storedDna.values()) {
                             if (Genes.GENE_STORAGE.get(gene).stream().map(Pair::getFirst).toList().contains(data.getEntityType())) {
                                 entities.remove(data.getEntityType());
                                 dinoDnas.add(data.getFormattedType().append(" ").append(data.getFormattedDNANoDescriptor()));
@@ -892,35 +894,38 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
                     }
                 }), true, 0);
             }
-        });
+        }
     }
 
-    public void renderSynthIngredientBar(GuiGraphics guiGraphics, int x, int y, float percent) {
-        guiGraphics.blit(SYNTH, x, y, 351, 128, Mth.floor(98 * percent), 8, 479, 199);
+    public void renderSynthIngredientBar(GuiGraphicsExtractor guiGraphics, int x, int y, float percent) {
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, SYNTH, x, y, 351, 128, Mth.floor(98 * percent), 8, 479, 199);
     }
 
     @Override
-    public boolean mouseReleased(double pMouseX, double pMouseY, int pButton) {
+    public boolean mouseReleased(MouseButtonEvent pEvent) {
         if (currentTab == 1) {
             this.menu.sendUpdate(dinoData);
         }
-        return super.mouseReleased(pMouseX, pMouseY, pButton);
+        return super.mouseReleased(pEvent);
     }
 
     public void calculateSliders() {
         activeSliders = 3;
-        if (dinoData.getBaseDino() != EntityType.PIG) {
+        if (dinoData.getBaseDino() != EntityTypes.PIG) {
             DNASlider slider = dNASliders.get(0);
             ItemStack stack = menu.storageSlot.getItem();
-            if (stack.hasTag()) {
-                DNAData data = DNAData.loadFromNBT(stack.getTag().getCompound(DNAData.createStorageKey(dinoData.getBaseDino(), null)));
-                slider.setDNAData(data);
-                double value = dinoData.getEntityPercentage(new DinoData.EntityInfo(dinoData.getBaseDino(), null));
-                slider.setValue(value, true);
-                slider.setEntityType(dinoData.getBaseDino());
-                slider.active = true;
-                sequencingDino = (LivingEntity) data.getEntityType().create(Minecraft.getInstance().level);
-                activeSliders = Mth.floor((data.getDnaPercentage() - 0.5d) / (0.5 / 6)) + 3;
+            Map<String, DNAData> storedDna = stack.getOrDefault(DataComponentInit.DISK_DNA.get(), Map.of());
+            if (!storedDna.isEmpty()) {
+                DNAData data = storedDna.get(DNAData.createStorageKey(dinoData.getBaseDino(), null));
+                if (data != null) {
+                    slider.setDNAData(data);
+                    double value = dinoData.getEntityPercentage(new DinoData.EntityInfo(dinoData.getBaseDino(), null));
+                    slider.setValue(value, true);
+                    slider.setEntityType(dinoData.getBaseDino());
+                    slider.active = true;
+                    sequencingDino = (LivingEntity) data.getEntityType().create(Minecraft.getInstance().level, EntitySpawnReason.LOAD);
+                    activeSliders = Mth.floor((data.getDnaPercentage() - 0.5d) / (0.5 / 6)) + 3;
+                }
             }
 
         }
@@ -944,8 +949,12 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
                     if (slider.getEntityType() == null && shouldAdd) {
                         slider.setEntityType(entry.getKey().type());
                         slider.setValue(entry.getValue(), true);
-                        DNAData data = DNAData.loadFromNBT(menu.storageSlot.getItem().getTag().getCompound(DNAData.createStorageKey(entry.getKey().type(), entry.getKey().variant())));
-                        slider.setDNAData(data);
+                        // typed local: chaining getOrDefault off the wildcard holder breaks generic inference
+                        Map<String, DNAData> dnaOnDisk = menu.storageSlot.getItem().getOrDefault(DataComponentInit.DISK_DNA.get(), Map.of());
+                        DNAData data = dnaOnDisk.get(DNAData.createStorageKey(entry.getKey().type(), entry.getKey().variant()));
+                        if (data != null) {
+                            slider.setDNAData(data);
+                        }
                         slider.active = true;
                         shouldAdd = false;
                     }
@@ -970,15 +979,5 @@ public class SequencerScreen extends AbstractContainerScreen<SequencerMenu> {
     @Override
     public void removeWidget(GuiEventListener pListener) {
         super.removeWidget(pListener);
-    }
-
-    @Override
-    public boolean mouseScrolled(double pMouseX, double pMouseY, double pDelta) {
-        return super.mouseScrolled(pMouseX, pMouseY, pDelta);
-    }
-
-    @Override
-    public boolean keyPressed(int pKeyCode, int pScanCode, int pModifiers) {
-        return super.keyPressed(pKeyCode, pScanCode, pModifiers);
     }
 }

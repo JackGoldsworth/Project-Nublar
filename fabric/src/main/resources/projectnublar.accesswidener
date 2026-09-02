@@ -1,0 +1,11 @@
+accessWidener v1 official
+
+# DelegateVoxelShape wraps another VoxelShape: super(delegate.shape) in its constructor
+accessible field net/minecraft/world/phys/shapes/VoxelShape shape Lnet/minecraft/world/phys/shapes/DiscreteVoxelShape;
+
+# Client initializer: MenuScreens.register is private, ScreenConstructor is package-private
+accessible class net/minecraft/client/gui/screens/MenuScreens$ScreenConstructor
+accessible method net/minecraft/client/gui/screens/MenuScreens register (Lnet/minecraft/world/inventory/MenuType;Lnet/minecraft/client/gui/screens/MenuScreens$ScreenConstructor;)V
+
+# Client initializer: custom item model codecs go into ItemModels.ID_MAPPER
+accessible field net/minecraft/client/renderer/item/ItemModels ID_MAPPER Lnet/minecraft/util/ExtraCodecs$LateBoundIdMapper;

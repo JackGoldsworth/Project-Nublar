@@ -4,19 +4,21 @@ import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.entity.ai.sensors.NearbyDinosaurSensor;
 import net.dumbcode.projectnublar.entity.ai.sensors.NearestFeederSensor;
 import net.dumbcode.projectnublar.entity.ai.sensors.NearestWaterSourceSensor;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.ai.sensing.SensorType;
-import net.tslat.smartbrainlib.api.core.sensor.ExtendedSensor;
+import net.dumbcode.projectnublar.platform.DeferredHolder;
+import net.dumbcode.projectnublar.platform.DeferredRegister;
 
 import java.util.function.Supplier;
 
 public class SensorTypesInit {
-    public static void init(){}
+    public static final DeferredRegister<SensorType<?>> SENSOR_TYPES = DeferredRegister.create(Registries.SENSOR_TYPE, Constants.MODID);
 
-    public static final Supplier<SensorType<NearestWaterSourceSensor<?>>> NEAREST_WATER_SOURCE = register("nearest_drinkable_source_block", NearestWaterSourceSensor::new);
-    public static final Supplier<SensorType<NearestFeederSensor<?>>> NEAREST_FEEDER_SENSOR = register("nearest_feeder_block", NearestFeederSensor::new);
-    public static final Supplier<SensorType<NearbyDinosaurSensor<?>>> NEARBY_DINOSAURS_SENSOR = register("nearest_dinosaurs", NearbyDinosaurSensor::new);
+    public static final DeferredHolder<SensorType<?>, SensorType<NearestWaterSourceSensor<?>>> NEAREST_WATER_SOURCE = SENSOR_TYPES.register("nearest_drinkable_source_block", () -> new SensorType<>(NearestWaterSourceSensor::new));
+    public static final DeferredHolder<SensorType<?>, SensorType<NearestFeederSensor<?>>> NEAREST_FEEDER_SENSOR = SENSOR_TYPES.register("nearest_feeder_block", () -> new SensorType<>(NearestFeederSensor::new));
+    public static final DeferredHolder<SensorType<?>, SensorType<NearbyDinosaurSensor<?>>> NEARBY_DINOSAURS_SENSOR = SENSOR_TYPES.register("nearest_dinosaurs", () -> new SensorType<>(NearbyDinosaurSensor::new));
 
-    private static <T extends ExtendedSensor<?>> Supplier<SensorType<T>> register(String id, Supplier<T> sensor) {
-        return Constants.PN_SBL_LOADER.registerSensorType(id, sensor);
+    public static void registerTo() {
+        SENSOR_TYPES.register();
     }
 }

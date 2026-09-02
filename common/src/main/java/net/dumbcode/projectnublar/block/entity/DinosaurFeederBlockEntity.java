@@ -1,14 +1,10 @@
 package net.dumbcode.projectnublar.block.entity;
 
-import earth.terrarium.botarium.common.energy.base.BotariumEnergyBlock;
-import earth.terrarium.botarium.common.energy.impl.WrappedBlockEnergyContainer;
 import net.dumbcode.projectnublar.block.api.SyncingContainerBlockEntity;
 import net.dumbcode.projectnublar.init.BlockInit;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -16,25 +12,25 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.Nullable;
-import software.bernie.geckolib.animatable.GeoBlockEntity;
-import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.core.animation.AnimatableManager;
-import software.bernie.geckolib.core.animation.AnimationController;
-import software.bernie.geckolib.core.animation.AnimationState;
-import software.bernie.geckolib.core.animation.RawAnimation;
-import software.bernie.geckolib.core.object.PlayState;
-import software.bernie.geckolib.util.GeckoLibUtil;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import com.geckolib.animatable.GeoBlockEntity;
+import com.geckolib.animatable.instance.AnimatableInstanceCache;
+import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.animation.AnimationController;
+import com.geckolib.animation.state.AnimationTest;
+import com.geckolib.animation.RawAnimation;
+import com.geckolib.animation.object.PlayState;
+import com.geckolib.util.GeckoLibUtil;
 
-public class DinosaurFeederBlockEntity extends SyncingContainerBlockEntity implements GeoBlockEntity, BotariumEnergyBlock<WrappedBlockEnergyContainer> {
+public class DinosaurFeederBlockEntity extends SyncingContainerBlockEntity implements GeoBlockEntity {
 
     private AnimatableInstanceCache INSTANCE = GeckoLibUtil.createInstanceCache(this);
-    private WrappedBlockEnergyContainer energyContainer;
 
     protected static final RawAnimation CLOSED_IDLE = RawAnimation.begin().thenPlayAndHold("idle");
     protected static final RawAnimation DISPENSE_FOOD = RawAnimation.begin().thenPlayAndHold("open");
 
-    protected <E extends DinosaurFeederBlockEntity> PlayState deployAnimController(final AnimationState<E> state) {
+    protected PlayState deployAnimController(final AnimationTest<DinosaurFeederBlockEntity> state) {
             if(this.shouldDispenseFood) {
                 return state.setAndContinue(DISPENSE_FOOD);
             } else {
@@ -90,22 +86,17 @@ public class DinosaurFeederBlockEntity extends SyncingContainerBlockEntity imple
     }
 
     @Override
-    protected void saveData(CompoundTag tag) {
-        tag.putInt("progress", progress);
-        tag.putBoolean("shouldDispenseFood", shouldDispenseFood);
-        tag.putBoolean("shouldDisplayFood", shouldDisplayFood);
+    protected void saveData(ValueOutput output) {
+        output.putInt("progress", progress);
+        output.putBoolean("shouldDispenseFood", shouldDispenseFood);
+        output.putBoolean("shouldDisplayFood", shouldDisplayFood);
     }
 
     @Override
-    protected void loadData(CompoundTag tag) {
-        shouldDispenseFood = tag.getBoolean("shouldDispenseFood");
-        shouldDisplayFood = tag.getBoolean("shouldDisplayFood");
-        progress = tag.getInt("progress");
-    }
-
-    @Override
-    public WrappedBlockEnergyContainer getEnergyStorage() {
-        return null;
+    protected void loadData(ValueInput input) {
+        shouldDispenseFood = input.getBooleanOr("shouldDispenseFood", false);
+        shouldDisplayFood = input.getBooleanOr("shouldDisplayFood", false);
+        progress = input.getIntOr("progress", 0);
     }
 
     @Override
@@ -237,36 +228,28 @@ public class DinosaurFeederBlockEntity extends SyncingContainerBlockEntity imple
         }
     }
     @Override
-    public CompoundTag getUpdateTag() {
-        CompoundTag tag =new CompoundTag();
-        tag.putBoolean("shouldDispenseFood", shouldDispenseFood);
-        tag.putBoolean("shouldDisplayFood", shouldDisplayFood);
-        return tag;
-    }
-
-    @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
-        if(tag.contains("shouldDispenseFood")) {
-            shouldDispenseFood = tag.getBoolean("shouldDispenseFood");
-        }
-        if(tag.contains("shouldDisplayFood")) {
-            shouldDisplayFood = tag.getBoolean("shouldDisplayFood");
-        }
-    }
-
-    @Override
-    public @Nullable Packet<ClientGamePacketListener> getUpdatePacket() {
-        return super.getUpdatePacket();
-    }
-
-    @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(this, this::deployAnimController));
+        controllers.add(new AnimationController<>(this::deployAnimController));
     }
 
     @Override
     public AnimatableInstanceCache getAnimatableInstanceCache() {
         return INSTANCE;
+    }
+
+    @Override
+    protected net.minecraft.core.NonNullList<ItemStack> getItems() {
+        NonNullList<ItemStack> items = NonNullList.withSize(getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < items.size(); i++) {
+            items.set(i, getItem(i));
+        }
+        return items;
+    }
+
+    @Override
+    protected void setItems(NonNullList<ItemStack> items) {
+        for (int i = 0; i < Math.min(items.size(), getContainerSize()); i++) {
+            setItem(i, items.get(i));
+        }
     }
 }

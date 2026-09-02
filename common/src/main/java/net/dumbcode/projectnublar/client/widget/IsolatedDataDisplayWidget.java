@@ -3,7 +3,7 @@ package net.dumbcode.projectnublar.client.widget;
 import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.client.screen.SequencerScreen;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
@@ -25,13 +25,14 @@ public class IsolatedDataDisplayWidget extends AbstractButton {
     }
 
     @Override
-    public void onPress() {
+    public void onPress(net.minecraft.client.input.InputWithModifiers input) {
         this.selected = !selected;
         onClick.onClick(this, selected);
     }
 
+    // 26.2: renderWidget is now extractContents (extract-then-submit widget rendering)
     @Override
-    protected void renderWidget(GuiGraphics guiGraphics, int i, int i1, float v) {
+    protected void extractContents(GuiGraphicsExtractor guiGraphics, int i, int i1, float v) {
         SequencerScreen.drawBorder(guiGraphics, getX(), getY(), getWidth(), getHeight(), Constants.BORDER_COLOR, 1);
         int color = 0xFF193B59;
         if (selected) {
@@ -41,7 +42,7 @@ public class IsolatedDataDisplayWidget extends AbstractButton {
             color = 0xFF063B6B;
         }
         guiGraphics.fill(getX() + 1, getY() + 1, getX() + getWidth() - 1, getY() + getHeight() - 1, color);
-        guiGraphics.drawCenteredString(Minecraft.getInstance().font, value, getX() + getWidth() / 2, getY() + getHeight() / 2 - 4, -1);
+        guiGraphics.centeredText(Minecraft.getInstance().font, value, getX() + getWidth() / 2, getY() + getHeight() / 2 - 4, -1);
     }
 
     @Override

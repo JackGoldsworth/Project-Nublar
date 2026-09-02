@@ -12,6 +12,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.BlockGetter;
@@ -72,7 +73,7 @@ public class BlockConnectableBase extends Block {
 
 
     @Override
-    public void entityInside(BlockState state, Level worldIn, BlockPos pos, Entity entityIn) {
+    protected void entityInside(BlockState state, Level worldIn, BlockPos pos, Entity entityIn, InsideBlockEffectApplier effectApplier, boolean isPrecise) {
         BlockEntity te = worldIn.getBlockEntity(pos);
         AABB entityBox = entityIn.getBoundingBox();
         if (te instanceof ConnectableBlockEntity) {
@@ -116,7 +117,7 @@ public class BlockConnectableBase extends Block {
 
 
     @Override
-    public boolean isPathfindable(BlockState pState, BlockGetter pLevel, BlockPos pPos, PathComputationType pType) {
+    protected boolean isPathfindable(BlockState pState, PathComputationType pType) {
         return false;
     }
 
@@ -447,7 +448,7 @@ public class BlockConnectableBase extends Block {
 //todo: on destroyed by player forge
 
     @Override
-    public void playerWillDestroy(Level world, BlockPos pos, BlockState state, Player player) {
+    public BlockState playerWillDestroy(Level world, BlockPos pos, BlockState state, Player player) {
         HitChunk chunk = getHitChunk(player);
         if (chunk != null) {
             chunk.connection().setBroken(true);
@@ -462,11 +463,12 @@ public class BlockConnectableBase extends Block {
             }
 
         }
+        return super.playerWillDestroy(world, pos, state, player);
     }
 
 
     @Override
-    public InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand, BlockHitResult ray) {
+    protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult ray) {
         if (ray instanceof DelegateBlockHitResult dbhr && dbhr.hitInfo instanceof HitChunk) {
             HitChunk chunk = (HitChunk) dbhr.hitInfo;
             BlockEntity te = world.getBlockEntity(pos);
@@ -494,7 +496,7 @@ public class BlockConnectableBase extends Block {
                     if (ref != null && ref.isBroken()) {
                         ref.setBroken(false);
                         te.setChanged();
-                        placeEffect(player, hand, world, pos);
+                        placeEffect(player, InteractionHand.MAIN_HAND, world, pos);
                         return InteractionResult.SUCCESS;
                     }
                 } else if (chunk.dir().getAxis() == Direction.Axis.X) {
@@ -505,7 +507,7 @@ public class BlockConnectableBase extends Block {
                             world.setBlock(nextPos, this.defaultBlockState(), 3);
                             nextTe = world.getBlockEntity(nextPos);
                             if (nextTe instanceof ConnectableBlockEntity && generateConnections(world, nextPos, (ConnectableBlockEntity) nextTe, chunk, null)) {
-                                placeEffect(player, hand, world, pos);
+                                placeEffect(player, InteractionHand.MAIN_HAND, world, pos);
                             }
 
                         }
@@ -514,14 +516,14 @@ public class BlockConnectableBase extends Block {
                         for (Connection connection : ((ConnectableBlockEntity) nextTe).getConnections()) {
                             if (connection.lazyEquals(chunk.connection())) {
                                 connection.setBroken(false);
-                                placeEffect(player, hand, world, pos);
+                                placeEffect(player, InteractionHand.MAIN_HAND, world, pos);
                                 nextTe.setChanged();
                                 return InteractionResult.SUCCESS;
                             }
                         }
                     }
                 }
-                if (player.getItemInHand(hand).getItem() == Item.byBlock(this)) {
+                if (player.getMainHandItem().getItem() == Item.byBlock(this)) {
                     return InteractionResult.CONSUME;
                 }
                 con.setSign(!con.isSign());

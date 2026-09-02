@@ -1,10 +1,10 @@
 package net.dumbcode.projectnublar.menutypes;
 
-import commonnetwork.api.Network;
 import net.dumbcode.projectnublar.api.DinoData;
 import net.dumbcode.projectnublar.block.entity.SequencerBlockEntity;
 import net.dumbcode.projectnublar.container.CloneDisplaySlot;
 import net.dumbcode.projectnublar.container.ToggleSlot;
+import net.dumbcode.projectnublar.init.DataComponentInit;
 import net.dumbcode.projectnublar.init.MenuTypeInit;
 import net.dumbcode.projectnublar.item.DiskStorageItem;
 import net.dumbcode.projectnublar.item.SyringeItem;
@@ -18,13 +18,13 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.dumbcode.projectnublar.platform.Services;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,7 +68,7 @@ public class SequencerMenu extends AbstractContainerMenu {
         this.addDataSlots(data);
         this.data = data;
         this.addSlot(this.storageSlot = new ToggleSlot(container, 0, 167, 61, (stack) -> stack.getItem() instanceof DiskStorageItem));
-        this.addSlot(this.dnaInputSlot = new ToggleSlot(container, 1, 167, 61, (stack) -> (stack.getItem() instanceof TestTubeItem || stack.getItem() instanceof SyringeItem) && stack.hasTag()));
+        this.addSlot(this.dnaInputSlot = new ToggleSlot(container, 1, 167, 61, (stack) -> (stack.getItem() instanceof TestTubeItem || stack.getItem() instanceof SyringeItem) && stack.has(DataComponentInit.DNA_DATA.get())));
         this.addSlot(this.emptyVialOutputSlot = new ToggleSlot(container, 2, 167, 61) {
             @Override
             public boolean mayPlace(ItemStack stack) {
@@ -114,8 +114,12 @@ public class SequencerMenu extends AbstractContainerMenu {
     }
 
     public SequencerMenu(int i, Inventory inventory, FriendlyByteBuf buf) {
+        this(i, inventory, buf.readBlockPos());
+    }
+
+    public SequencerMenu(int i, Inventory inventory, BlockPos pos) {
         this(i, inventory);
-        this.pos = buf.readBlockPos();
+        this.pos = pos;
     }
 
     public int getDataSlot(int slot) {
@@ -216,6 +220,6 @@ public class SequencerMenu extends AbstractContainerMenu {
     }
 
     public void sendUpdate(DinoData data){
-        Network.getNetworkHandler().sendToServer(new UpdateEditInfoPacket(data, pos),true);
+        Services.PLATFORM.sendToServer(new UpdateEditInfoPacket(data, pos));
     }
 }

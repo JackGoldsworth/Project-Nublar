@@ -4,7 +4,7 @@ import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.api.DNAData;
 import net.dumbcode.projectnublar.client.screen.SequencerScreen;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
@@ -31,13 +31,14 @@ public class SequenceDataDisplayWidget extends AbstractButton {
     }
 
     @Override
-    public void onPress() {
+    public void onPress(net.minecraft.client.input.InputWithModifiers input) {
         this.selected = !selected;
         onClick.onClick(this, selected);
     }
 
+    // 26.2: renderWidget is now extractContents (extract-then-submit widget rendering)
     @Override
-    protected void renderWidget(GuiGraphics guiGraphics, int i, int i1, float v) {
+    protected void extractContents(GuiGraphicsExtractor guiGraphics, int i, int i1, float v) {
         SequencerScreen.drawBorder(guiGraphics, getX(), getY(), getWidth(), getHeight(), Constants.BORDER_COLOR, 1);
         int color = 0xFF193B59;
         if (selected) {
@@ -47,9 +48,14 @@ public class SequenceDataDisplayWidget extends AbstractButton {
             color = 0xFF063B6B;
         }
         guiGraphics.fill(getX() + 1, getY() + 1, getX() + getWidth() - 1, getY() + getHeight() - 1, color);
-        if(stack.get() != null && !stack.get().isEmpty() && stack.get().hasTag()) {
-            DNAData dnaData = DNAData.loadFromNBT(stack.get().getTag().getCompound(value));
-            guiGraphics.drawCenteredString(Minecraft.getInstance().font, dnaData.getFormattedType().getString() + ": " + dnaData.getFormattedDNANoDescriptor().getString(), getX() + width / 2, getY() + 3, 0xFFFFFFFF);
+        if (stack.get() != null && !stack.get().isEmpty()) {
+            // 26.2: stack NBT is gone — the disk's DNA entries live in the DISK_DNA map component.
+            // typed local: chaining getOrDefault off the wildcard holder breaks generic inference
+            java.util.Map<String, DNAData> dnaOnDisk = stack.get().getOrDefault(net.dumbcode.projectnublar.init.DataComponentInit.DISK_DNA.get(), java.util.Map.of());
+            DNAData dnaData = dnaOnDisk.get(value);
+            if (dnaData != null) {
+                guiGraphics.centeredText(Minecraft.getInstance().font, dnaData.getFormattedType().getString() + ": " + dnaData.getFormattedDNANoDescriptor().getString(), getX() + width / 2, getY() + 3, 0xFFFFFFFF);
+            }
         }
     }
 

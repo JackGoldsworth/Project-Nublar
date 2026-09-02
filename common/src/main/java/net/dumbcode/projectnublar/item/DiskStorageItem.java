@@ -3,14 +3,14 @@ package net.dumbcode.projectnublar.item;
 import com.mojang.datafixers.util.Pair;
 import net.dumbcode.projectnublar.api.DNAData;
 import net.dumbcode.projectnublar.api.Genes;
+import net.dumbcode.projectnublar.init.DataComponentInit;
 import net.dumbcode.projectnublar.init.GeneInit;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class DiskStorageItem extends Item {
@@ -26,17 +26,16 @@ public class DiskStorageItem extends Item {
     }
 
     public static double getGeneCompletion(Genes.Gene gene, ItemStack stack) {
+        Map<String, DNAData> storedDna = stack.getOrDefault(DataComponentInit.DISK_DNA.get(), Map.of());
         double totalPercent = 0;
-        for (String key : stack.getTag().getAllKeys()) {
-            DNAData data = DNAData.loadFromNBT(stack.getTag().getCompound(key));
+        for (DNAData data : storedDna.values()) {
             if (Genes.GENE_STORAGE.get(gene).stream().map(Pair::getFirst).toList().contains(data.getEntityType())) {
                 totalPercent += data.getDnaPercentage();
             }
         }
         if(gene == GeneInit.COLOR.get()){
             Set<DyeColor> blah = new HashSet<>();
-            stack.getTag().getAllKeys().forEach(key -> {
-                DNAData data = DNAData.loadFromNBT(stack.getTag().getCompound(key));
+            storedDna.values().forEach(data -> {
                 blah.add(data.gettFish1());
                 blah.add(data.gettFish2());
             });

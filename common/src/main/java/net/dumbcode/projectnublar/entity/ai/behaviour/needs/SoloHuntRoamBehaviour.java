@@ -1,4 +1,5 @@
 package net.dumbcode.projectnublar.entity.ai.behaviour.needs;
+import net.minecraft.world.entity.ai.behavior.declarative.MemoryCondition;
 
 import com.mojang.datafixers.util.Pair;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -11,19 +12,20 @@ import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.entity.ai.util.DefaultRandomPos;
 import net.minecraft.world.entity.ai.util.LandRandomPos;
 import net.minecraft.world.phys.Vec3;
-import net.tslat.smartbrainlib.api.core.behaviour.ExtendedBehaviour;
-import net.tslat.smartbrainlib.object.SquareRadius;
-import net.tslat.smartbrainlib.util.BrainUtils;
+import net.tslat.smartbrainlib.api.core.behaviour.base.ExtendedBehaviour;
+import net.tslat.smartbrainlib.library.object.SquareRadius;
+import net.tslat.smartbrainlib.util.BrainUtil;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Set;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
 public class SoloHuntRoamBehaviour <E extends PathfinderMob> extends ExtendedBehaviour<E> {
-    private static final List<Pair<MemoryModuleType<?>, MemoryStatus>> MEMORY_REQUIREMENTS = ObjectArrayList.of(Pair.of(MemoryModuleType.WALK_TARGET, MemoryStatus.VALUE_ABSENT),
-            Pair.of(MemoryModuleTypeInit.HUNTING.get(), MemoryStatus.VALUE_PRESENT));
+    private static final Set<MemoryCondition<?, ?>> MEMORY_REQUIREMENTS = Set.of(new MemoryCondition.Absent<>(MemoryModuleType.WALK_TARGET),
+            new MemoryCondition.Present<>(MemoryModuleTypeInit.HUNTING.get()));
 
     protected BiFunction<E, Vec3, Float> speedModifier = (entity, targetPos) -> 1f;
     protected Predicate<E> avoidWaterPredicate = entity -> true;
@@ -31,7 +33,7 @@ public class SoloHuntRoamBehaviour <E extends PathfinderMob> extends ExtendedBeh
     protected BiPredicate<E, Vec3> positionPredicate = (entity, pos) -> true;
 
     @Override
-    protected List<Pair<MemoryModuleType<?>, MemoryStatus>> getMemoryRequirements() {
+    public Set<MemoryCondition<?, ?>> getMemoryRequirements() {
         return MEMORY_REQUIREMENTS;
     }
 
@@ -80,7 +82,7 @@ public class SoloHuntRoamBehaviour <E extends PathfinderMob> extends ExtendedBeh
 
     @Override
     protected boolean checkExtraStartConditions(ServerLevel level, E entity) {
-        return !BrainUtils.hasMemory(entity, MemoryModuleType.ATTACK_TARGET);
+        return !BrainUtil.hasMemory(entity, MemoryModuleType.ATTACK_TARGET);
     }
 
     @Override
@@ -91,10 +93,10 @@ public class SoloHuntRoamBehaviour <E extends PathfinderMob> extends ExtendedBeh
             targetPos = null;
 
         if (targetPos == null) {
-            BrainUtils.clearMemory(entity, MemoryModuleType.WALK_TARGET);
+            BrainUtil.clearMemory(entity, MemoryModuleType.WALK_TARGET);
         }
         else {
-            BrainUtils.setMemory(entity, MemoryModuleType.WALK_TARGET, new WalkTarget(targetPos, this.speedModifier.apply(entity, targetPos), 0));
+            BrainUtil.setMemory(entity, MemoryModuleType.WALK_TARGET, new WalkTarget(targetPos, this.speedModifier.apply(entity, targetPos), 0));
         }
     }
 

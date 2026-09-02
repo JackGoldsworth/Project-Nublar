@@ -29,81 +29,89 @@ public class DinosaurFeederBlock extends BaseEntityBlock {
         this.path = path;
     }
 
+    // 26.2: feeder blocks have no Properties-only ctor; the codec is only used for
+    // block-state serialization, which never re-creates these blocks
     @Override
-    public void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
-        super.onPlace(state, level, pos, oldState, movedByPiston);
+    public com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return com.mojang.serialization.MapCodec.unit(this);
     }
 
     @Override
-    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
-        if(!level.isClientSide){
+    protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+        if (!level.isClientSide()) {
             BlockEntity blockEntity = level.getBlockEntity(pos);
 
-            if(blockEntity instanceof DinosaurFeederBlockEntity fbe) {
-                if ((player.getItemInHand(hand).is(TagInit.FEEDER_MEAT) && fbe.getItem(0).isEmpty()) || (!fbe.getItem(0).isEmpty() && player.getItemInHand(hand).is(fbe.getItem(0).getItem()))) {
-                    fbe.setItem(0, player.getItemInHand(hand));
-                    player.getItemInHand(hand).shrink(1);
+            if (blockEntity instanceof DinosaurFeederBlockEntity fbe) {
+                if ((stack.is(TagInit.FEEDER_MEAT) && fbe.getItem(0).isEmpty()) || (!fbe.getItem(0).isEmpty() && stack.is(fbe.getItem(0).getItem()))) {
+                    fbe.setItem(0, stack);
+                    stack.shrink(1);
                     return InteractionResult.SUCCESS;
                 }
-                if ((player.getItemInHand(hand).is(TagInit.FEEDER_MEAT) && fbe.getItem(1).isEmpty()) || (!fbe.getItem(1).isEmpty() && player.getItemInHand(hand).is(fbe.getItem(1).getItem()))) {
-                    fbe.setItem(1, player.getItemInHand(hand));
-                    player.getItemInHand(hand).shrink(1);
+                if ((stack.is(TagInit.FEEDER_MEAT) && fbe.getItem(1).isEmpty()) || (!fbe.getItem(1).isEmpty() && stack.is(fbe.getItem(1).getItem()))) {
+                    fbe.setItem(1, stack);
+                    stack.shrink(1);
                     return InteractionResult.SUCCESS;
                 }
-                if ((player.getItemInHand(hand).is(TagInit.FEEDER_MEAT) && fbe.getItem(2).isEmpty()) || (!fbe.getItem(2).isEmpty() && player.getItemInHand(hand).is(fbe.getItem(2).getItem()))) {
-                    fbe.setItem(2, player.getItemInHand(hand));
-                    player.getItemInHand(hand).shrink(1);
+                if ((stack.is(TagInit.FEEDER_MEAT) && fbe.getItem(2).isEmpty()) || (!fbe.getItem(2).isEmpty() && stack.is(fbe.getItem(2).getItem()))) {
+                    fbe.setItem(2, stack);
+                    stack.shrink(1);
                     return InteractionResult.SUCCESS;
                 }
+            }
+        }
+        return super.useItemOn(stack, state, level, pos, player, hand, hit);
+    }
+
+    @Override
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+        InteractionHand hand = InteractionHand.MAIN_HAND;
+        if (!level.isClientSide()) {
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+
+            if (blockEntity instanceof DinosaurFeederBlockEntity fbe) {
                 if (player.getItemInHand(hand).isEmpty() && !fbe.coolDown && !player.isCrouching()) {
                     fbe.dispenseFood();
                     return InteractionResult.SUCCESS;
                 }
                 if (player.getItemInHand(hand).isEmpty() && player.isCrouching()) {
-                    if(!fbe.getItem(0).isEmpty()){
-                        ItemStack stack = new ItemStack(fbe.getItem(0).getItem());
-                        ItemStack copy = stack.copy();
-                        copy.setCount(stack.getCount());
+                    if (!fbe.getItem(0).isEmpty()) {
+                        ItemStack copy = fbe.getItem(0).copy();
                         player.setItemInHand(hand, copy);
                         fbe.setItem(0, ItemStack.EMPTY);
                         return InteractionResult.SUCCESS;
                     }
-                    if(!fbe.getItem(1).isEmpty()){
-                        ItemStack stack = new ItemStack(fbe.getItem(1).getItem());
-                        ItemStack copy = stack.copy();
-                        copy.setCount(stack.getCount());
+                    if (!fbe.getItem(1).isEmpty()) {
+                        ItemStack copy = fbe.getItem(1).copy();
                         player.setItemInHand(hand, copy);
                         fbe.setItem(1, ItemStack.EMPTY);
                         return InteractionResult.SUCCESS;
                     }
-                    if(!fbe.getItem(2).isEmpty()){
-                        ItemStack stack = new ItemStack(fbe.getItem(2).getItem());
-                        ItemStack copy = stack.copy();
-                        copy.setCount(stack.getCount());
+                    if (!fbe.getItem(2).isEmpty()) {
+                        ItemStack copy = fbe.getItem(2).copy();
                         player.setItemInHand(hand, copy);
                         fbe.setItem(2, ItemStack.EMPTY);
                         return InteractionResult.SUCCESS;
                     }
                 }
             }
-
         }
-        if(level.isClientSide){
+        if (level.isClientSide()) {
             BlockEntity blockEntity = level.getBlockEntity(pos);
-            if(blockEntity instanceof DinosaurFeederBlockEntity fbe) {
-                if (player.getItemInHand(hand).is(Items.PORKCHOP)|| player.getItemInHand(hand).is(Items.BEEF)|| player.getItemInHand(hand).is(Items.CHICKEN)) {
-                    if(!fbe.shouldDisplayFood){
+            if (blockEntity instanceof DinosaurFeederBlockEntity fbe) {
+                if (player.getItemInHand(hand).is(Items.PORKCHOP) || player.getItemInHand(hand).is(Items.BEEF) || player.getItemInHand(hand).is(Items.CHICKEN)) {
+                    if (!fbe.shouldDisplayFood) {
                         fbe.setTexture(true);
                     }
                 }
             }
         }
-        return super.use(state, level, pos, player, hand, hit);
+        return super.useWithoutItem(state, level, pos, player, hit);
     }
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
-        return RenderShape.ENTITYBLOCK_ANIMATED;
+        // 26.2: ENTITYBLOCK_ANIMATED is gone; the feeder model is drawn by CarnivoreFeederRenderer
+        return RenderShape.INVISIBLE;
     }
 
     @Override

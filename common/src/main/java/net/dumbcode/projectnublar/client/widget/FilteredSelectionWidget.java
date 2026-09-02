@@ -1,32 +1,28 @@
 package net.dumbcode.projectnublar.client.widget;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.SharedConstants;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratedElementType;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.navigation.FocusNavigationEvent;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
+import net.minecraft.util.StringUtil;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -37,7 +33,7 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.SelectionEntry<T>> extends AbstractWidget implements GuiEventListener {
-    private static final ResourceLocation ICON_OVERLAY_LOCATION = new ResourceLocation("textures/gui/resource_packs.png");
+    private static final Identifier ICON_OVERLAY_LOCATION = Identifier.parse("textures/gui/resource_packs.png");
     private static final int ENTRY_HEIGHT = 18;
 
     private final Component title;
@@ -92,8 +88,10 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
         this.font = Minecraft.getInstance().font;
     }
 
+    // 26.2: renderWidget is now extractWidgetRenderState (extract-then-submit rendering);
+    // the old z-offset pose push is gone — the dropdown raises its own stratum instead
     @Override
-    public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderFilter(guiGraphics, mouseX, mouseY, partialTick);
         entriesFiltered = entries.stream().filter(this::testFilter).toList();
         int x = this.getX();
@@ -104,14 +102,12 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
         if (extended) {
             int boxHeight = Math.max(1, ENTRY_HEIGHT * Math.min(entriesFiltered.size(), 4)) + 2;
 
-            guiGraphics.pose().pushPose();
-
-            guiGraphics.pose().translate(0, 0, 100);
+            guiGraphics.nextStratum();
 
             guiGraphics.fill(x, y + ENTRY_HEIGHT - 1, x + width, y + ENTRY_HEIGHT + boxHeight - 1, 0xFFFFFFFF);
             guiGraphics.fill(x + 1, y + ENTRY_HEIGHT, x + width - 1, y + ENTRY_HEIGHT + boxHeight - 2, 0xFF000000);
 
-            guiGraphics.blit(ICON_OVERLAY_LOCATION, x + width - 14, y + 1, 114, 5, 11, 7);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ICON_OVERLAY_LOCATION, x + width - 14, y + 1, 114, 5, 11, 7, 256, 256);
 
             E hoverEntry = getEntryAtPosition(mouseX, mouseY);
 
@@ -132,18 +128,16 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
                 guiGraphics.fill(x + width - 5, scrollY, x + width - 1, scrollY + barHeight, 0xFF666666);
                 guiGraphics.fill(x + width - 4, scrollY + 1, x + width - 2, scrollY + barHeight - 1, 0xFFAAAAAA);
             }
-
-            guiGraphics.pose().popPose();
         } else {
-            guiGraphics.blit(ICON_OVERLAY_LOCATION, x + width - 14, y + 1, 82, 20, 11, 7);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ICON_OVERLAY_LOCATION, x + width - 14, y + 1, 82, 20, 11, 7, 256, 256);
         }
     }
 
-    protected void render(GuiGraphics guiGraphics, int x, int y, int width, int height) {
+    protected void render(GuiGraphicsExtractor guiGraphics, int x, int y, int width, int height) {
         if (selected != null) {
             selected.render(guiGraphics, title, x, y, width, false, this.active ? 16777215 : 10526880, alpha);
         } else {
-            guiGraphics.drawString(font, title, x + 6, y + (height - 8) / 2, this.active ? 16777215 : 10526880 | Mth.ceil(alpha * 255.0F) << 24, false);
+            guiGraphics.text(font, title, x + 6, y + (height - 8) / 2, this.active ? 16777215 : 10526880 | Mth.ceil(alpha * 255.0F) << 24, false);
         }
     }
 
@@ -156,7 +150,11 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
     }
 
     @Override
-    public boolean mouseClicked(double pMouseX, double pMouseY, int pButton) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        // 26.2: raw (x, y, button) mouse events became MouseButtonEvent records
+        double pMouseX = event.x();
+        double pMouseY = event.y();
+        int pButton = event.button();
         int x = this.getX();
         int y = this.getY();
         if (visible && active && pMouseX >= (x + width - 17) && pMouseX <= x + width && pMouseY >= y && pMouseY <= y + getHeight()) {
@@ -212,23 +210,23 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
         //        extended = false;
         //        scrollOffset = 0;
 
-        return super.mouseClicked(pMouseX, pMouseY, pButton);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         int x = this.getX();
         int y = this.getY();
         int maxY = y + ENTRY_HEIGHT * Math.min(entriesFiltered.size() + 1, 5);
         if (extended && mouseX >= x && mouseX <= x + width && mouseY > y + ENTRY_HEIGHT && mouseY < maxY) {
-            if (delta < 0 && scrollOffset < entriesFiltered.size() - 4) {
+            if (scrollY < 0 && scrollOffset < entriesFiltered.size() - 4) {
                 scrollOffset++;
-            } else if (delta > 0 && scrollOffset > 0) {
+            } else if (scrollY > 0 && scrollOffset > 0) {
                 scrollOffset--;
             }
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, delta);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
@@ -359,7 +357,7 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
         int i = Math.min(this.cursorPos, this.highlightPos);
         int j = Math.max(this.cursorPos, this.highlightPos);
         int k = this.maxLength - this.value.length() - (i - j);
-        String s = SharedConstants.filterText(pTextToWrite);
+        String s = StringUtil.filterText(pTextToWrite);
         int l = s.length();
         if (k < l) {
             s = s.substring(0, k);
@@ -382,8 +380,9 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
 
     }
 
-    private void deleteText(int pCount) {
-        if (Screen.hasControlDown()) {
+    // 26.2: modifier state now comes from the key event, not Screen statics
+    private void deleteText(int pCount, boolean hasControlDown) {
+        if (hasControlDown) {
             this.deleteWords(pCount);
         } else {
             this.deleteChars(pCount);
@@ -510,25 +509,26 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
         this.moveCursorTo(this.value.length());
     }
 
-    public boolean keyPressed(int pKeyCode, int pScanCode, int pModifiers) {
+    // 26.2: raw (key, scancode, modifiers) events became KeyEvent / CharacterEvent records
+    public boolean keyPressed(KeyEvent event) {
         if (!this.canConsumeInput()) {
             return false;
         } else {
-            this.shiftPressed = Screen.hasShiftDown();
-            if (Screen.isSelectAll(pKeyCode)) {
+            this.shiftPressed = event.hasShiftDown();
+            if (event.isSelectAll()) {
                 this.moveCursorToEnd();
                 this.setHighlightPos(0);
                 return true;
-            } else if (Screen.isCopy(pKeyCode)) {
+            } else if (event.isCopy()) {
                 Minecraft.getInstance().keyboardHandler.setClipboard(this.getHighlighted());
                 return true;
-            } else if (Screen.isPaste(pKeyCode)) {
+            } else if (event.isPaste()) {
                 if (this.isEditable) {
                     this.insertText(Minecraft.getInstance().keyboardHandler.getClipboard());
                 }
 
                 return true;
-            } else if (Screen.isCut(pKeyCode)) {
+            } else if (event.isCut()) {
                 Minecraft.getInstance().keyboardHandler.setClipboard(this.getHighlighted());
                 if (this.isEditable) {
                     this.insertText("");
@@ -536,12 +536,12 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
 
                 return true;
             } else {
-                switch (pKeyCode) {
+                switch (event.key()) {
                     case 259:
                         if (this.isEditable) {
                             this.shiftPressed = false;
-                            this.deleteText(-1);
-                            this.shiftPressed = Screen.hasShiftDown();
+                            this.deleteText(-1, event.hasControlDownWithQuirk());
+                            this.shiftPressed = event.hasShiftDown();
                         }
 
                         return true;
@@ -555,13 +555,13 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
                     case 261:
                         if (this.isEditable) {
                             this.shiftPressed = false;
-                            this.deleteText(1);
-                            this.shiftPressed = Screen.hasShiftDown();
+                            this.deleteText(1, event.hasControlDownWithQuirk());
+                            this.shiftPressed = event.hasShiftDown();
                         }
 
                         return true;
                     case 262:
-                        if (Screen.hasControlDown()) {
+                        if (event.hasControlDownWithQuirk()) {
                             this.moveCursorTo(this.getWordPosition(1));
                         } else {
                             this.moveCursor(1);
@@ -569,7 +569,7 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
 
                         return true;
                     case 263:
-                        if (Screen.hasControlDown()) {
+                        if (event.hasControlDownWithQuirk()) {
                             this.moveCursorTo(this.getWordPosition(-1));
                         } else {
                             this.moveCursor(-1);
@@ -591,12 +591,12 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
         return this.isVisible() && this.isFocused() && this.isEditable();
     }
 
-    public boolean charTyped(char pCodePoint, int pModifiers) {
+    public boolean charTyped(CharacterEvent event) {
         if (!this.canConsumeInput()) {
             return false;
-        } else if (SharedConstants.isAllowedChatCharacter(pCodePoint)) {
+        } else if (event.isAllowedChatCharacter()) {
             if (this.isEditable) {
-                this.insertText(Character.toString(pCodePoint));
+                this.insertText(event.codepointAsString());
             }
 
             return true;
@@ -605,7 +605,7 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
         }
     }
 
-    public void renderFilter(GuiGraphics guiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
+    public void renderFilter(GuiGraphicsExtractor guiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
         int x = this.getX();
         int y = this.getY();
         if (this.isVisible()) {
@@ -630,7 +630,9 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
 
             if (!s.isEmpty()) {
                 String s1 = flag ? s.substring(0, j) : s;
-                j1 = guiGraphics.drawString(this.font, this.formatter.apply(s1, this.displayPos), l, i1, i2);
+                FormattedCharSequence seq = this.formatter.apply(s1, this.displayPos);
+                guiGraphics.text(this.font, seq, l, i1, i2);
+                j1 = l + this.font.width(seq);
             }
 
             boolean flag2 = this.cursorPos < this.value.length() || this.value.length() >= this.getMaxLength();
@@ -643,24 +645,24 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
             }
 
             if (!s.isEmpty() && flag && j < s.length()) {
-                guiGraphics.drawString(this.font, this.formatter.apply(s.substring(j), this.cursorPos), j1, i1, i2);
+                guiGraphics.text(this.font, this.formatter.apply(s.substring(j), this.cursorPos), j1, i1, i2);
             }
 
             if (!flag2 && this.suggestion != null) {
-                guiGraphics.drawString(this.font, this.suggestion, (k1 - 1), i1, 0xFF808080);
+                guiGraphics.text(this.font, this.suggestion, (k1 - 1), i1, 0xFF808080);
             }
 
             if (flag1) {
                 if (flag2) {
                     guiGraphics.fill(k1, i1 - 1, k1 + 1, i1 + 1 + 9, 0xFFD0D0D0);
                 } else {
-                    guiGraphics.drawString(this.font, "_", k1, i1, i2);
+                    guiGraphics.text(this.font, "_", k1, i1, i2);
                 }
             }
 
             if (k != j) {
                 int l1 = l + this.font.width(s.substring(0, k));
-                this.renderHighlight(k1, i1 - 1, l1 - 1, i1 + 1 + 9);
+                this.renderHighlight(guiGraphics, k1, i1 - 1, l1 - 1, i1 + 1 + 9);
             }
 
         }
@@ -669,46 +671,19 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
     /**
      * Draws the blue selection box.
      */
-    private void renderHighlight(int pStartX, int pStartY, int pEndX, int pEndY) {
-        if (pStartX < pEndX) {
-            int i = pStartX;
-            pStartX = pEndX;
-            pEndX = i;
-        }
+    private void renderHighlight(GuiGraphicsExtractor guiGraphics, int pStartX, int pStartY, int pEndX, int pEndY) {
+        // 26.2: the OR_REVERSE logic-op quad is gone — vanilla EditBox uses textHighlight,
+        // which inverts the covered text instead of painting over it
+        int x0 = Math.min(pStartX, pEndX);
+        int x1 = Math.max(pStartX, pEndX);
+        int y0 = Math.min(pStartY, pEndY);
+        int y1 = Math.max(pStartY, pEndY);
 
-        if (pStartY < pEndY) {
-            int j = pStartY;
-            pStartY = pEndY;
-            pEndY = j;
-        }
+        int right = this.getX() + this.width;
+        x1 = Math.min(x1, right);
+        x0 = Math.min(x0, right);
 
-        int x = this.getX();
-        int y = this.getY();
-
-        if (pEndX > x + this.width) {
-            pEndX = x + this.width;
-        }
-
-        if (pStartX > x + this.width) {
-            pStartX = x + this.width;
-        }
-
-        Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder bufferbuilder = tesselator.getBuilder();
-        RenderSystem.setShader(GameRenderer::getPositionShader);
-        RenderSystem.setShaderColor(0.0F, 0.0F, 1.0F, 1.0F);
-        // RenderSystem.disableTexture();
-        RenderSystem.enableColorLogicOp();
-        RenderSystem.logicOp(GlStateManager.LogicOp.OR_REVERSE);
-        bufferbuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
-        bufferbuilder.vertex((double) pStartX, (double) pEndY, 0.0D).endVertex();
-        bufferbuilder.vertex((double) pEndX, (double) pEndY, 0.0D).endVertex();
-        bufferbuilder.vertex((double) pEndX, (double) pStartY, 0.0D).endVertex();
-        bufferbuilder.vertex((double) pStartX, (double) pStartY, 0.0D).endVertex();
-        tesselator.end();
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        RenderSystem.disableColorLogicOp();
-        // RenderSystem.enableTexture();
+        guiGraphics.textHighlight(x0, y0, x1, y1, false);
     }
 
     /**
@@ -873,12 +848,12 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
     }
 
     public record SelectionEntry<T>(T object, Component message,
-                                    @Nullable ResourceLocation icon) implements GuiEventListener {
+                                    @Nullable Identifier icon) implements GuiEventListener {
         public SelectionEntry(T object, Component message) {
             this(object, message, null);
         }
 
-        public void render(GuiGraphics guiGraphics, @Nullable Component title, int x, int y, int width, boolean hovered, int fgColor, float alpha) {
+        public void render(GuiGraphicsExtractor guiGraphics, @Nullable Component title, int x, int y, int width, boolean hovered, int fgColor, float alpha) {
             if (hovered) {
                 guiGraphics.fill(x, y, x + width, y + ENTRY_HEIGHT, 0xFFA0A0A0);
             }
@@ -890,9 +865,9 @@ public class FilteredSelectionWidget<T, E extends FilteredSelectionWidget.Select
             FormattedText composite = title == null ? FormattedText.composite(formattedMessage) : FormattedText.composite(title, formattedMessage);
             FormattedCharSequence text = Language.getInstance().getVisualOrder(composite);
             if (icon != null) {
-                guiGraphics.blit(icon, x + 1, y + 1, 0, 0, ENTRY_HEIGHT-2, ENTRY_HEIGHT-2, ENTRY_HEIGHT-2, ENTRY_HEIGHT-2);
+                guiGraphics.blit(RenderPipelines.GUI_TEXTURED, icon, x + 1, y + 1, 0, 0, ENTRY_HEIGHT-2, ENTRY_HEIGHT-2, ENTRY_HEIGHT-2, ENTRY_HEIGHT-2);
             }
-            guiGraphics.drawString(font, text, x + 1 + (icon == null ? 0 : ENTRY_HEIGHT-2), y + (ENTRY_HEIGHT - 8) / 2, fgColor | Mth.ceil(alpha * 255.0F) << 24);
+            guiGraphics.text(font, text, x + 1 + (icon == null ? 0 : ENTRY_HEIGHT-2), y + (ENTRY_HEIGHT - 8) / 2, fgColor | Mth.ceil(alpha * 255.0F) << 24);
         }
 
         @Override

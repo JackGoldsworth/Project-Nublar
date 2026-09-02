@@ -1,7 +1,6 @@
 package net.dumbcode.projectnublar.block;
 
 import com.google.common.collect.Lists;
-import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.block.api.BlockConnectableBase;
 import net.dumbcode.projectnublar.block.api.ConnectableBlockEntity;
 import net.dumbcode.projectnublar.block.api.Connection;
@@ -12,18 +11,14 @@ import net.dumbcode.projectnublar.init.ItemInit;
 import net.dumbcode.projectnublar.util.LineUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -71,7 +66,8 @@ public class ElectricFencePostBlock extends BlockConnectableBase implements Enti
 
     @Override
     public RenderShape getRenderShape(BlockState pState) {
-        return RenderShape.ENTITYBLOCK_ANIMATED;
+        // 26.2: ENTITYBLOCK_ANIMATED is gone; the pole is drawn by ElectricFenceRenderer
+        return RenderShape.INVISIBLE;
     }
 
     @Override
@@ -88,7 +84,7 @@ public class ElectricFencePostBlock extends BlockConnectableBase implements Enti
     public boolean canSurvive(BlockState state, LevelReader world, BlockPos pos) {
         boolean flag = true;
         for (int i = 0; i < this.type.getHeight(); i++) {
-            flag &= world.getBlockState(pos.above(i)).getBlock().canBeReplaced(state, Fluids.EMPTY);
+            flag &= world.getBlockState(pos.above(i)).canBeReplaced(Fluids.EMPTY);
         }
         return flag;
     }
@@ -113,10 +109,10 @@ public class ElectricFencePostBlock extends BlockConnectableBase implements Enti
 
 
     @Override
-    public InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand, BlockHitResult ray) {
+    protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult ray) {
         int index = state.getValue(indexProperty);
         if (index == 0) {
-            ItemStack stack = player.getItemInHand(hand);
+            ItemStack stack = player.getMainHandItem();
             if (stack.isEmpty()) {
                 BlockEntity te = world.getBlockEntity(pos);
                 if (te instanceof BlockEntityElectricFencePole fencePole) {
@@ -131,15 +127,17 @@ public class ElectricFencePostBlock extends BlockConnectableBase implements Enti
                     return InteractionResult.SUCCESS;
                 }
             } else if (stack.getItem() == ItemInit.WIRE_SPOOL.get()) { //Move to item class ?
-                CompoundTag nbt = stack.getOrCreateTagElement(Constants.MODID);
-                if (nbt.contains("fence_position", Tag.TAG_COMPOUND)) {
-                    BlockPos other = NbtUtils.readBlockPos(nbt.getCompound("fence_position"));
+                // 26.2: stack NBT is gone — the target fence position is stored on the
+                // wire spool via the CUSTOM_DATA data component as a packed long
+                CompoundTag nbt = stack.getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.EMPTY).copyTag();
+                if (nbt.contains("fence_position")) {
+                    BlockPos other = BlockPos.of(nbt.getLongOr("fence_position", 0L));
                     double dist = Math.sqrt(other.distSqr(pos));
                     if (dist > LIMIT) {
-                        if (!world.isClientSide) {
-                            player.displayClientMessage(Component.translatable("projectnublar.fences.length.toolong", Math.round(dist), LIMIT), true);
+                        if (!world.isClientSide()) {
+                            sendActionBarMessage(player, Component.translatable("projectnublar.fences.length.toolong", Math.round(dist), LIMIT));
                         }
-                        nbt.put("fence_position", NbtUtils.writeBlockPos(pos));
+                        nbt.putLong("fence_position", pos.asLong());
                     } else if (world.getBlockState(other).getBlock() == this && !other.equals(pos)) {
                         int itemMax;
                         int itemAmount = itemMax = Mth.ceil(dist / ElectricFenceBlock.ITEM_FOLD * this.type.getHeight());
@@ -157,7 +155,7 @@ public class ElectricFencePostBlock extends BlockConnectableBase implements Enti
                         }
                         itemAmount -= stack.getCount();
 
-                        for (ItemStack itemStack : player.getInventory().items) {
+                        for (ItemStack itemStack : player.getInventory().getNonEquipmentItems()) {
                             if (itemStack != stack && itemStack.getItem() == ItemInit.WIRE_SPOOL.get()) {
                                 if (itemAmount <= itemStack.getCount()) {
                                     total += itemAmount;
@@ -172,8 +170,8 @@ public class ElectricFencePostBlock extends BlockConnectableBase implements Enti
                             }
                         }
                         if (!full) {
-                            if (!world.isClientSide) {
-                                player.displayClientMessage(Component.translatable("projectnublar.fences.length.notenough", itemMax, total), true);
+                            if (!world.isClientSide()) {
+                                sendActionBarMessage(player, Component.translatable("projectnublar.fences.length.notenough", itemMax, total));
                             }
                         } else {
                             if (!player.isCreative()) {
@@ -197,60 +195,34 @@ public class ElectricFencePostBlock extends BlockConnectableBase implements Enti
                                 }
                             }
                         }
-                        nbt.put("fence_position", NbtUtils.writeBlockPos(pos));
+                        nbt.putLong("fence_position", pos.asLong());
                     } else {
                         nbt.remove("fence_position");
                     }
                 } else {
-                    nbt.put("fence_position", NbtUtils.writeBlockPos(pos));
+                    nbt.putLong("fence_position", pos.asLong());
                 }
+                stack.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(nbt));
                 return InteractionResult.SUCCESS;
             }
         } else if (world.getBlockState(pos.below(index)).getBlock() == this) {
-            return this.use(world.getBlockState(pos.below(index)), world, pos.below(index), player, hand, ray);
+            return this.useWithoutItem(world.getBlockState(pos.below(index)), world, pos.below(index), player, ray);
         }
-        return super.use(state, world, pos, player, hand, ray);
+        return super.useWithoutItem(state, world, pos, player, ray);
     }
 
-    @Override
-    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
-        BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (blockEntity instanceof BlockEntityElectricFencePole fencePole) {
-            for (Connection connection : fencePole.getConnections()) {
-                BlockPos fromPos = connection.getFrom();
-                if (fromPos.equals(pos)) {
-                    fromPos = connection.getTo();
-                }
-                if (level.getBlockState(fromPos).getBlock() != this || true) {
-                    for (BlockPos blockPos : LineUtils.getBlocksInbetween(connection.getFrom(), connection.getTo(), connection.getOffset())) {
-                        if (blockPos.equals(connection.getTo()) || blockPos.equals(connection.getFrom())) {
-                            BlockEntity be  = level.getBlockEntity(blockPos);
-
-                            if (be instanceof BlockEntityElectricFencePole fencePole1 && fencePole1 != fencePole) {
-                                connection.setBroken(true);
-                            }
-
-                            continue;
-                        }
-
-
-                        BlockEntity te = level.getBlockEntity(blockPos);
-                        if (te instanceof ConnectableBlockEntity connectableBlockEntity) {
-                            boolean left = false;
-                            for (Connection bitcon : connectableBlockEntity.getConnections()) {
-                                if (connection.lazyEquals(bitcon)) {
-                                    bitcon.setBroken(true);
-                                }
-                                left |= !bitcon.isBroken();
-                            }
-                            if (!left) {
-                                level.setBlock(blockPos, Blocks.AIR.defaultBlockState(), 3);
-                            }
-                        }
-                    }
-                }
-            }
+    // 26.2: displayClientMessage is gone; action-bar text is sent as a packet
+    private static void sendActionBarMessage(Player player, Component message) {
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            serverPlayer.connection.send(new net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket(message));
         }
+    }
+
+    // 26.2: onRemove is gone. Wire connection teardown happens in
+    // BlockEntityElectricFencePole.preRemoveSideEffects while the pole's block entity is
+    // still alive; this hook only clears the pole's remaining column segments.
+    @Override
+    protected void affectNeighborsAfterRemoval(BlockState state, net.minecraft.server.level.ServerLevel level, BlockPos pos, boolean movedByPiston) {
         if (!destroying) {
             destroying = true;
             int index = state.getValue(indexProperty);
@@ -262,17 +234,13 @@ public class ElectricFencePostBlock extends BlockConnectableBase implements Enti
             }
             destroying = false;
         }
-        super.onRemove(state, level, pos, newState, movedByPiston);
-    }
-
-    @Override
-    public void destroy(LevelAccessor world, BlockPos pos, BlockState state) {
-        super.destroy(world, pos, state);
+        super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
     }
 
 
+    // 26.2: getLightBlock(BlockState, BlockGetter, BlockPos) is now getLightDampening(BlockState)
     @Override
-    public int getLightBlock(BlockState state, BlockGetter world, BlockPos pos) {
+    protected int getLightDampening(BlockState state) {
         return state.getValue(POWERED_PROPERTY) && state.getValue(indexProperty) == this.type.getHeight() - 1 ? this.type.getLightLevel() : 0;
     }
 

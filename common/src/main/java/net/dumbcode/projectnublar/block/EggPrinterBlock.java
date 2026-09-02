@@ -1,6 +1,5 @@
 package net.dumbcode.projectnublar.block;
 
-import com.google.common.collect.ImmutableMap;
 import net.dumbcode.projectnublar.block.api.MultiBlock;
 import net.dumbcode.projectnublar.block.api.MultiEntityBlock;
 import net.dumbcode.projectnublar.block.entity.EggPrinterBlockEntity;
@@ -10,7 +9,6 @@ import net.dumbcode.projectnublar.init.ItemInit;
 import net.dumbcode.projectnublar.item.ComputerChipItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -22,7 +20,6 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.function.Function;
 
 public class EggPrinterBlock extends MultiEntityBlock {
 
@@ -32,24 +29,24 @@ public class EggPrinterBlock extends MultiEntityBlock {
 
 
     @Override
-    public InteractionResult use(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
-        if (!pLevel.isClientSide) {
+    protected InteractionResult useWithoutItem(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, BlockHitResult pHit) {
+        if (!pLevel.isClientSide()) {
             BlockEntity blockEntity = pLevel.getBlockEntity(MultiBlock.getCorePos(pState, pPos));
             if (blockEntity instanceof EggPrinterBlockEntity sbe) {
-                if (pPlayer.getItemInHand(pHand).is(ItemInit.LEVELING_SENSOR.get())) {
+                if (pPlayer.getMainHandItem().is(ItemInit.LEVELING_SENSOR.get())) {
                     sbe.setSensor(pPlayer.getMainHandItem().copy());
-                    pPlayer.getItemInHand(pHand).shrink(1);
+                    pPlayer.getMainHandItem().shrink(1);
                     return InteractionResult.CONSUME;
                 }
-                if (pPlayer.getItemInHand(pHand).getItem() instanceof ComputerChipItem) {
+                if (pPlayer.getMainHandItem().getItem() instanceof ComputerChipItem) {
                     sbe.setChip(pPlayer.getMainHandItem().copy());
-                    pPlayer.getItemInHand(pHand).shrink(1);
+                    pPlayer.getMainHandItem().shrink(1);
                     return InteractionResult.CONSUME;
                 }
             }
-            return super.use(pState, pLevel, pPos, pPlayer, pHand, pHit);
+            return super.useWithoutItem(pState, pLevel, pPos, pPlayer, pHit);
         }
-        return InteractionResult.sidedSuccess(pLevel.isClientSide);
+        return InteractionResult.SUCCESS;
     }
 
     @Override
@@ -65,11 +62,6 @@ public class EggPrinterBlock extends MultiEntityBlock {
     @Override
     public BlockEntity createBlockEntity(BlockPos blockPos, BlockState blockState) {
         return new EggPrinterBlockEntity(blockPos, blockState);
-    }
-
-    @Override
-    protected ImmutableMap<BlockState, VoxelShape> getShapeForEachState(Function<BlockState, VoxelShape> pShapeGetter) {
-        return super.getShapeForEachState(pShapeGetter);
     }
 
     @Nullable

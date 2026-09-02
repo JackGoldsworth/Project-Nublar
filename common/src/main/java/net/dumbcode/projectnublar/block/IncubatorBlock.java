@@ -4,12 +4,12 @@ import net.dumbcode.projectnublar.block.api.MultiBlock;
 import net.dumbcode.projectnublar.block.api.MultiEntityBlock;
 import net.dumbcode.projectnublar.block.entity.IncubatorBlockEntity;
 import net.dumbcode.projectnublar.client.ModShapes;
+import net.dumbcode.projectnublar.platform.Services;
 import net.dumbcode.projectnublar.init.BlockInit;
 import net.dumbcode.projectnublar.init.ItemInit;
 import net.dumbcode.projectnublar.item.BulbItem;
 import net.dumbcode.projectnublar.item.ContainerUpgradeItem;
 import net.dumbcode.projectnublar.item.PlantTankItem;
-import net.dumbcode.projectnublar.platform.Services;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
@@ -35,8 +35,8 @@ public class IncubatorBlock extends MultiEntityBlock {
         super(properties, rows, columns, depth);
     }
     @Override
-    public InteractionResult use(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
-        if (!pLevel.isClientSide && pHand == InteractionHand.MAIN_HAND) {
+    public InteractionResult useItemOn(ItemStack pStack, BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
+        if (!pLevel.isClientSide() && pHand == InteractionHand.MAIN_HAND) {
             BlockEntity blockEntity = pLevel.getBlockEntity(MultiBlock.getCorePos(pState, pPos));
             ItemStack stack = pPlayer.getMainHandItem();
             if (blockEntity instanceof IncubatorBlockEntity incubator) {
@@ -101,16 +101,14 @@ public class IncubatorBlock extends MultiEntityBlock {
                 }
             }
         }
-        return super.use(pState, pLevel, pPos, pPlayer, pHand, pHit);
+        return super.useItemOn(pStack, pState, pLevel, pPos, pPlayer, pHand, pHit);
     }
 
     @Override
     protected void openContainer(Level pLevel, BlockPos pPos, Player pPlayer) {
         BlockEntity blockentity = pLevel.getBlockEntity(pPos);
         if (blockentity instanceof IncubatorBlockEntity) {
-            Services.PLATFORM.openMenu((ServerPlayer) pPlayer, (MenuProvider) blockentity, buf -> {
-                ((FriendlyByteBuf) buf).writeBlockPos(pPos);
-            });
+            Services.PLATFORM.openMenu((ServerPlayer) pPlayer, (MenuProvider) blockentity, pPos);
 
             //todo: add stat
 //            pPlayer.awardStat(getOpenState());
@@ -153,7 +151,7 @@ public class IncubatorBlock extends MultiEntityBlock {
 //            }
 //            return super.use(pState, pLevel, pPos, pPlayer, pHand, pHit);
 //        }
-//        return InteractionResult.sidedSuccess(pLevel.isClientSide);
+//        return InteractionResult.SUCCESS;
 //    }
 
     @Override

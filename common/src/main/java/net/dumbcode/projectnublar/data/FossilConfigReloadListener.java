@@ -6,23 +6,27 @@ import net.dumbcode.projectnublar.Constants;
 import net.dumbcode.projectnublar.api.*;
 import net.dumbcode.projectnublar.api.fossil.*;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.FileToIdConverter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
+import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.EntityType;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.BufferedReader;
 import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class FossilConfigReloadListener extends SimpleJsonResourceReloadListener {
+public class FossilConfigReloadListener extends SimplePreparableReloadListener<Map<Identifier, JsonElement>> {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     private static final String LOCATION = "config/fossils";
+    private static final FileToIdConverter CONVERTER = FileToIdConverter.json(LOCATION);
     private static final String FOSSIL_PERIOD = "time_periods";
     private static final String FOSSIL_SET = "fossil_sets";
     private static final String FOSSIL_QUALITY = "qualities";
@@ -37,14 +41,25 @@ public class FossilConfigReloadListener extends SimpleJsonResourceReloadListener
 
 
     public FossilConfigReloadListener() {
-        super(GSON, LOCATION);
-
         Constants.LOG.info("Fossil Config initialized, scanning folder: data/'{}'", LOCATION);
 
     }
 
     @Override
-    protected void apply(Map<ResourceLocation, JsonElement> elements, ResourceManager resourceManager, ProfilerFiller profiler) {
+    protected Map<Identifier, JsonElement> prepare(ResourceManager resourceManager, ProfilerFiller profiler) {
+        Map<Identifier, JsonElement> map = new HashMap<>();
+        for (Map.Entry<Identifier, Resource> entry : CONVERTER.listMatchingResources(resourceManager).entrySet()) {
+            try (BufferedReader reader = entry.getValue().openAsReader()) {
+                map.put(CONVERTER.fileToId(entry.getKey()), JsonParser.parseReader(reader));
+            } catch (Exception e) {
+                Constants.LOG.error("Failed to parse Fossil Config file: {} - Error: {}", entry.getKey(), e.getMessage());
+            }
+        }
+        return map;
+    }
+
+    @Override
+    protected void apply(Map<Identifier, JsonElement> elements, ResourceManager resourceManager, ProfilerFiller profiler) {
         Map<String, FossilPeriod> newPeriodMap = new HashMap<>();
         Map<String, FossilQuality> newQualityMap = new HashMap<>();
         Map<EntityType<?>, Fossils> newFossilsMap = new HashMap<>();
@@ -52,8 +67,8 @@ public class FossilConfigReloadListener extends SimpleJsonResourceReloadListener
         Map<String, TraceFossils> newTraceFossilsMap = new HashMap<>();
         Map<String, AmberFossils> newAmberFossilsMap = new HashMap<>();
 
-        for(Map.Entry<ResourceLocation,JsonElement> entry: elements.entrySet()) {
-            ResourceLocation fileID = entry.getKey();
+        for(Map.Entry<Identifier,JsonElement> entry: elements.entrySet()) {
+            Identifier fileID = entry.getKey();
             JsonElement element = entry.getValue();
 
             try {
@@ -140,7 +155,7 @@ public class FossilConfigReloadListener extends SimpleJsonResourceReloadListener
                     }.getType();
 
                     String rlString = GsonHelper.getAsString(jsonObject, "species");
-                    ResourceLocation entityRl = ResourceLocation.tryParse(rlString);
+                    Identifier entityRl = Identifier.tryParse(rlString);
 
                     EntityType<?> entityType = BuiltInRegistries.ENTITY_TYPE.getOptional(entityRl).orElseThrow(() -> new JsonSyntaxException("Unknown entity_id" + entityRl + "in Fossil config file: " + fileID));
 

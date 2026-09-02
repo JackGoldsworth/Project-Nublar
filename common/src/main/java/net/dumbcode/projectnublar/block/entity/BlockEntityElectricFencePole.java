@@ -2,32 +2,34 @@ package net.dumbcode.projectnublar.block.entity;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import earth.terrarium.botarium.common.energy.base.BotariumEnergyBlock;
-import earth.terrarium.botarium.common.energy.impl.InsertOnlyEnergyContainer;
-import earth.terrarium.botarium.common.energy.impl.WrappedBlockEnergyContainer;
 import net.dumbcode.projectnublar.block.ElectricFencePostBlock;
 import net.dumbcode.projectnublar.block.api.ConnectableBlockEntity;
 import net.dumbcode.projectnublar.block.api.Connection;
+import net.dumbcode.projectnublar.util.LineUtils;
+import net.dumbcode.projectnublar.block.api.MachineEnergyHandler;
 import net.dumbcode.projectnublar.block.api.MathUtils;
+import net.dumbcode.projectnublar.block.api.NublarEnergyBlock;
 import net.dumbcode.projectnublar.init.BlockInit;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import software.bernie.geckolib.animatable.GeoBlockEntity;
-import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.core.animation.AnimatableManager;
-import software.bernie.geckolib.util.GeckoLibUtil;
+import com.geckolib.animatable.GeoBlockEntity;
+import com.geckolib.animatable.instance.AnimatableInstanceCache;
+import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.util.GeckoLibUtil;
+
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
-public class BlockEntityElectricFencePole extends BlockEntityElectricFence implements ConnectableBlockEntity, GeoBlockEntity, BotariumEnergyBlock<WrappedBlockEnergyContainer> {
+public class BlockEntityElectricFencePole extends BlockEntityElectricFence implements ConnectableBlockEntity, GeoBlockEntity, NublarEnergyBlock {
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     public boolean flippedAround;
@@ -54,7 +56,7 @@ public class BlockEntityElectricFencePole extends BlockEntityElectricFence imple
         return shouldRefreshNextTick;
     }
 
-    private WrappedBlockEnergyContainer energyContainer;
+    private MachineEnergyHandler energyHandler;
 
 
     public BlockEntityElectricFencePole(BlockPos pos, BlockState state) {
@@ -62,18 +64,62 @@ public class BlockEntityElectricFencePole extends BlockEntityElectricFence imple
     }
 
     @Override
-    public void saveData(CompoundTag compound) {
-        compound.putBoolean("rotation_flipped", this.flippedAround);
-        compound.put("energy", this.energyContainer.serialize(new CompoundTag()));
-        super.saveData(compound);
+    protected void saveData(ValueOutput output) {
+        output.putBoolean("rotation_flipped", this.flippedAround);
+        getEnergyHandler().serialize(output.child("energy"));
+        super.saveData(output);
     }
 
 
     @Override
-    public void loadData(CompoundTag compound) {
-        this.flippedAround = compound.getBoolean("rotation_flipped");
-        this.energyContainer.deserialize(compound.getCompound("energy"));
-        super.loadData(compound);
+    protected void loadData(ValueInput input) {
+        this.flippedAround = input.getBooleanOr("rotation_flipped", false);
+        getEnergyHandler().deserialize(input.childOrEmpty("energy"));
+        super.loadData(input);
+    }
+
+    // 26.2: the wire teardown that used to live in ElectricFencePostBlock#onRemove — it needs
+    // this block entity's connections, so it runs here while the pole is still alive
+    @Override
+    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+        super.preRemoveSideEffects(pos, state);
+        if (this.level == null) {
+            return;
+        }
+        for (Connection connection : this.getConnections()) {
+            BlockPos fromPos = connection.getFrom();
+            if (fromPos.equals(pos)) {
+                fromPos = connection.getTo();
+            }
+            if (this.level.getBlockState(fromPos).getBlock() != state.getBlock() || true) {
+                for (BlockPos blockPos : LineUtils.getBlocksInbetween(connection.getFrom(), connection.getTo(), connection.getOffset())) {
+                    if (blockPos.equals(connection.getTo()) || blockPos.equals(connection.getFrom())) {
+                        BlockEntity be = this.level.getBlockEntity(blockPos);
+
+                        if (be instanceof BlockEntityElectricFencePole fencePole1 && fencePole1 != this) {
+                            connection.setBroken(true);
+                        }
+
+                        continue;
+                    }
+
+
+                    BlockEntity te = this.level.getBlockEntity(blockPos);
+                    if (te instanceof ConnectableBlockEntity connectableBlockEntity) {
+                        boolean left = false;
+                        for (Connection bitcon : connectableBlockEntity.getConnections()) {
+                            if (connection.lazyEquals(bitcon)) {
+                                bitcon.setBroken(true);
+                            }
+                            left |= !bitcon.isBroken();
+                        }
+                        if (!left) {
+                            this.level.setBlock(blockPos, Blocks.AIR.defaultBlockState(), 3);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Override
@@ -102,13 +148,13 @@ public class BlockEntityElectricFencePole extends BlockEntityElectricFence imple
         if (oldRotation != this.cachedRotation) {
             this.level.sendBlockUpdated(this.getBlockPos(), this.getBlockState(), this.getBlockState(), 3);
         }
-        boolean powered = this.getEnergyStorage().getStoredEnergy() > 0;
+        boolean powered = this.getEnergyHandler().getStoredEnergy() > 0;
         if(powered) {
             boolean update = false;
             if (this.level.getBlockState(this.getBlockPos()).getValue(ElectricFencePostBlock.POWERED_PROPERTY) != powered) {
                 update = true;
             }
-            getEnergyStorage().internalExtract(10, false);
+            getEnergyHandler().internalExtract(10, false);
             BlockState state = this.level.getBlockState(this.getBlockPos());
             if (state.getBlock() instanceof ElectricFencePostBlock && state.getValue(((ElectricFencePostBlock) state.getBlock()).getIndexProperty()) == 0) {
                 if (update) {
@@ -121,22 +167,22 @@ public class BlockEntityElectricFencePole extends BlockEntityElectricFence imple
                     }
                 }
                 //Pass power to other poles connected to this.
-                if (this.getEnergyStorage().getStoredEnergy() > 300) {
-                    Set<WrappedBlockEnergyContainer> storages = Sets.newLinkedHashSet();
+                if (this.getEnergyHandler().getStoredEnergy() > 300) {
+                    Set<MachineEnergyHandler> storages = Sets.newLinkedHashSet();
                     for (Connection connection : this.getConnections()) {
                         BlockEntity te = this.level.getBlockEntity(connection.getPosition().equals(connection.getFrom()) ? connection.getTo() : connection.getFrom());
                         if (te != null) {
                             if (te instanceof BlockEntityElectricFencePole e) {
-                                storages.add(e.getEnergyStorage());
+                                storages.add(e.getEnergyHandler());
                             }
                         }
                     }
-                    List<WrappedBlockEnergyContainer> list = Lists.newArrayList(storages);
-                    list.sort(Comparator.comparing(WrappedBlockEnergyContainer::getStoredEnergy));
-                    for (WrappedBlockEnergyContainer storage : list) {
-                        long sendEnergy = storage.internalInsert(this.getEnergyStorage().internalExtract(300 / list.size(), true), true);
-                        this.getEnergyStorage().internalExtract(sendEnergy, false);
-                        storage.internalInsert(sendEnergy, false);
+                    List<MachineEnergyHandler> list = Lists.newArrayList(storages);
+                    list.sort(Comparator.comparing(MachineEnergyHandler::getStoredEnergy));
+                    for (MachineEnergyHandler storage : list) {
+                        long sendEnergy = storage.internalInsert(this.getEnergyHandler().internalExtract(300 / list.size(), true), true);
+                        this.getEnergyHandler().internalExtract((int) sendEnergy, false);
+                        storage.internalInsert((int) sendEnergy, false);
                     }
                 }
             }
@@ -209,6 +255,35 @@ public class BlockEntityElectricFencePole extends BlockEntityElectricFence imple
         return rotation;
     }
 
+    // Formerly BlockEntityElectricFencePoleMixin (1.20.1 forge) — native NeoForge model data in 26.2
+    @Override
+    public void requestModelDataUpdate() {
+        this.cachedRotation = this.computeRotation();
+
+        BlockState state = this.getBlockState();
+        if (state.getBlock() instanceof ElectricFencePostBlock) {
+            net.dumbcode.projectnublar.block.api.ConnectionType type = ((ElectricFencePostBlock) state.getBlock()).getType();
+
+            float t = type.getHalfSize();
+            double x = Math.sin(Math.toRadians(this.cachedRotation + 90F - type.getRotationOffset())) * type.getRadius();
+            double z = Math.cos(Math.toRadians(this.cachedRotation + 90F - type.getRotationOffset())) * type.getRadius();
+            this.cachedShape = Shapes.box(x-t, 0, z-t, x+t, 1, z+t).move(0.5, 0, 0.5);
+        }
+
+        super.requestModelDataUpdate();
+    }
+
+    @Override
+    public void triggerModelUpdate() {
+        this.requestModelDataUpdate();
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        this.shouldRefreshNextTick = true;
+    }
+
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
 
@@ -221,7 +296,7 @@ public class BlockEntityElectricFencePole extends BlockEntityElectricFence imple
 
 
     @Override
-    public WrappedBlockEnergyContainer getEnergyStorage() {
-        return energyContainer == null ? this.energyContainer = new WrappedBlockEnergyContainer(this, new InsertOnlyEnergyContainer(350,350)) : this.energyContainer;
+    public MachineEnergyHandler getEnergyHandler() {
+        return energyHandler == null ? this.energyHandler = new MachineEnergyHandler(350, 350, 0, this::setChanged) : this.energyHandler;
     }
 }

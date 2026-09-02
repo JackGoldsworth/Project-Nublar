@@ -72,7 +72,7 @@ public class TyrannosaurusRexEntity extends CarnivoreDinosaur {
             serverLevel.addFreshEntity(part);
         }
         part.setParent(parent);
-        if (parent != null && !part.level().isClientSide) {
+        if (parent != null && !part.level().isClientSide()) {
             float renderYawOffset =  parent.yBodyRot;
 
             if(part.getPartName().equals("head")) {
@@ -82,22 +82,6 @@ public class TyrannosaurusRexEntity extends CarnivoreDinosaur {
 
 
         }
-    }
-
-    @Override
-    protected void defineSynchedData() {
-        super.defineSynchedData();
-    }
-
-    @Override
-    public void addAdditionalSaveData(CompoundTag tag) {
-        super.addAdditionalSaveData(tag);
-
-    }
-
-    @Override
-    public void readAdditionalSaveData(CompoundTag pTag) {
-        super.readAdditionalSaveData(pTag);
     }
 
     @Override

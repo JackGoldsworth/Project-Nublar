@@ -1,6 +1,7 @@
 package net.dumbcode.projectnublar.item;
 
 import net.dumbcode.projectnublar.api.DNAData;
+import net.dumbcode.projectnublar.init.DataComponentInit;
 import net.dumbcode.projectnublar.item.api.DNADataItem;
 import net.dumbcode.projectnublar.Constants;
 import net.minecraft.network.chat.Component;
@@ -13,8 +14,8 @@ public class AmberItem extends DNADataItem {
 
     @Override
     public Component getName(ItemStack stack) {
-        if(stack.hasTag()){
-            DNAData data = DNAData.loadFromNBT(stack.getTag().getCompound("DNAData"));
+        DNAData data = stack.get(DataComponentInit.DNA_DATA.get());
+        if(data != null){
             return Component.translatable("item." + Constants.MODID + ".amber", data.getFormattedType());
         }
         return super.getName(stack);

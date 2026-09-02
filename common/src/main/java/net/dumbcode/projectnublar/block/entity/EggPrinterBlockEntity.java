@@ -1,9 +1,8 @@
 package net.dumbcode.projectnublar.block.entity;
 
-import earth.terrarium.botarium.common.energy.base.BotariumEnergyBlock;
-import earth.terrarium.botarium.common.energy.impl.InsertOnlyEnergyContainer;
-import earth.terrarium.botarium.common.energy.impl.WrappedBlockEnergyContainer;
 import net.dumbcode.projectnublar.block.api.IMachineParts;
+import net.dumbcode.projectnublar.block.api.MachineEnergyHandler;
+import net.dumbcode.projectnublar.block.api.NublarEnergyBlock;
 import net.dumbcode.projectnublar.block.api.SyncingContainerBlockEntity;
 import net.dumbcode.projectnublar.init.BlockInit;
 import net.dumbcode.projectnublar.init.ItemInit;
@@ -11,7 +10,6 @@ import net.dumbcode.projectnublar.item.ComputerChipItem;
 import net.dumbcode.projectnublar.menutypes.EggPrinterMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -20,12 +18,14 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import software.bernie.geckolib.animatable.GeoBlockEntity;
-import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.core.animation.AnimatableManager;
-import software.bernie.geckolib.util.GeckoLibUtil;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import com.geckolib.animatable.GeoBlockEntity;
+import com.geckolib.animatable.instance.AnimatableInstanceCache;
+import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.util.GeckoLibUtil;
 
-public class EggPrinterBlockEntity extends SyncingContainerBlockEntity implements GeoBlockEntity, IMachineParts, BotariumEnergyBlock<WrappedBlockEnergyContainer> {
+public class EggPrinterBlockEntity extends SyncingContainerBlockEntity implements GeoBlockEntity, IMachineParts, NublarEnergyBlock {
     private AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     private ItemStack embryoInput = ItemStack.EMPTY;
     private ItemStack bonemealInput = ItemStack.EMPTY;
@@ -78,7 +78,7 @@ public class EggPrinterBlockEntity extends SyncingContainerBlockEntity implement
     };
     private ItemStack sensor = ItemStack.EMPTY;
     private ItemStack chip = ItemStack.EMPTY;
-    private WrappedBlockEnergyContainer energyContainer;
+    private MachineEnergyHandler energyHandler;
 
     public EggPrinterBlockEntity(BlockPos pos, BlockState state) {
         super(BlockInit.EGG_PRINTER_BLOCK_ENTITY.get(), pos, state);
@@ -97,15 +97,15 @@ public class EggPrinterBlockEntity extends SyncingContainerBlockEntity implement
             bonemealInput.shrink(1);
             shouldUpdate = true;
         }
-        isPrinting = !embryoInput.isEmpty() && bonemealAmount >= 16 && eggOutput.isEmpty() && getEnergyStorage().getStoredEnergy() > 32;
+        isPrinting = !embryoInput.isEmpty() && bonemealAmount >= 16 && eggOutput.isEmpty() && getEnergyHandler().getStoredEnergy() > 32;
         if(isPrinting){
-            getEnergyStorage().internalExtract(calculateEnergyConsumption(),true);
+            getEnergyHandler().internalExtract(calculateEnergyConsumption(),true);
             progress += 1;
             if(progress >= getMaxProgress()){
                 progress = 0;
                 bonemealAmount-=16;
                 isPrinting = false;
-                eggOutput = new ItemStack(level.random.nextInt(10) == getBreakChance() ? ItemInit.CRACKED_ARTIFICIAL_EGG.get() : ItemInit.ARTIFICIAL_EGG.get());
+                eggOutput = new ItemStack(level.getRandom().nextInt(10) == getBreakChance() ? ItemInit.CRACKED_ARTIFICIAL_EGG.get() : ItemInit.ARTIFICIAL_EGG.get());
                 embryoInput = ItemStack.EMPTY;
                 if(syringeOutput.isEmpty()) {
                     syringeOutput = new ItemStack(ItemInit.SYRINGE.get());
@@ -136,33 +136,33 @@ public class EggPrinterBlockEntity extends SyncingContainerBlockEntity implement
         return c;
     }
     @Override
-    public WrappedBlockEnergyContainer getEnergyStorage() {
-        return energyContainer == null ? this.energyContainer = new WrappedBlockEnergyContainer(this, new InsertOnlyEnergyContainer(1000,1000)) : this.energyContainer;
+    public MachineEnergyHandler getEnergyHandler() {
+        return energyHandler == null ? this.energyHandler = new MachineEnergyHandler(1000, 1000, 0, this::setChanged) : this.energyHandler;
     }
     @Override
-    protected void saveData(CompoundTag tag) {
-        tag.put("embryoInput", embryoInput.save(new CompoundTag()));
-        tag.put("bonemealInput", bonemealInput.save(new CompoundTag()));
-        tag.put("eggOutput", eggOutput.save(new CompoundTag()));
-        tag.put("syringeOutput", syringeOutput.save(new CompoundTag()));
-        tag.putInt("bonemealAmount", bonemealAmount);
-        tag.putInt("bonemealMax", bonemealMax);
-        tag.putInt("progress", progress);
-        tag.putInt("maxProgress", maxProgress);
-        tag.putBoolean("isPrinting", isPrinting);
+    protected void saveData(ValueOutput output) {
+        output.store("embryoInput", ItemStack.OPTIONAL_CODEC, embryoInput);
+        output.store("bonemealInput", ItemStack.OPTIONAL_CODEC, bonemealInput);
+        output.store("eggOutput", ItemStack.OPTIONAL_CODEC, eggOutput);
+        output.store("syringeOutput", ItemStack.OPTIONAL_CODEC, syringeOutput);
+        output.putInt("bonemealAmount", bonemealAmount);
+        output.putInt("bonemealMax", bonemealMax);
+        output.putInt("progress", progress);
+        output.putInt("maxProgress", maxProgress);
+        output.putBoolean("isPrinting", isPrinting);
     }
 
     @Override
-    protected void loadData(CompoundTag tag) {
-        embryoInput = ItemStack.of(tag.getCompound("embryoInput"));
-        bonemealInput = ItemStack.of(tag.getCompound("bonemealInput"));
-        eggOutput = ItemStack.of(tag.getCompound("eggOutput"));
-        syringeOutput = ItemStack.of(tag.getCompound("syringeOutput"));
-        bonemealAmount = tag.getInt("bonemealAmount");
-        bonemealMax = tag.getInt("bonemealMax");
-        progress = tag.getInt("progress");
-        maxProgress = tag.getInt("maxProgress");
-        isPrinting = tag.getBoolean("isPrinting");
+    protected void loadData(ValueInput input) {
+        embryoInput = input.read("embryoInput", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        bonemealInput = input.read("bonemealInput", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        eggOutput = input.read("eggOutput", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        syringeOutput = input.read("syringeOutput", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        bonemealAmount = input.getIntOr("bonemealAmount", 0);
+        bonemealMax = input.getIntOr("bonemealMax", 0);
+        progress = input.getIntOr("progress", 0);
+        maxProgress = input.getIntOr("maxProgress", 0);
+        isPrinting = input.getBooleanOr("isPrinting", false);
     }
 
     @Override
@@ -328,5 +328,30 @@ public class EggPrinterBlockEntity extends SyncingContainerBlockEntity implement
     @Override
     public NonNullList<ItemStack> getMachineParts() {
         return NonNullList.of(ItemStack.EMPTY, sensor, chip);
+    }
+
+    @Override
+    protected net.minecraft.core.NonNullList<ItemStack> getItems() {
+        NonNullList<ItemStack> items = NonNullList.withSize(getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < items.size(); i++) {
+            items.set(i, getItem(i));
+        }
+        return items;
+    }
+
+    @Override
+    protected void setItems(NonNullList<ItemStack> items) {
+        for (int i = 0; i < Math.min(items.size(), getContainerSize()); i++) {
+            setItem(i, items.get(i));
+        }
+    }
+
+    // 26.2: machine-part items are dropped here instead of in the old Block#onRemove
+    @Override
+    public void preRemoveSideEffects(net.minecraft.core.BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
+        super.preRemoveSideEffects(pos, state);
+        if (this.level != null) {
+            net.minecraft.world.Containers.dropContents(this.level, pos, this.getMachineParts());
+        }
     }
 }
